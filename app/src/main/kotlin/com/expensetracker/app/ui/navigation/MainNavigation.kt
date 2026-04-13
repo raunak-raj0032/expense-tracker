@@ -1,0 +1,192 @@
+package com.expensetracker.app.ui.navigation
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.expensetracker.app.ui.screens.analytics.AnalyticsScreen
+import com.expensetracker.app.ui.screens.calendar.CalendarScreen
+import com.expensetracker.app.ui.screens.capture.CaptureReviewScreen
+import com.expensetracker.app.ui.screens.home.HomeScreen
+import com.expensetracker.app.ui.screens.ledger.LedgerScreen
+import com.expensetracker.app.ui.screens.settings.SettingsScreen
+import com.expensetracker.app.ui.screens.transaction.AddEditTransactionScreen
+import com.expensetracker.app.ui.theme.AuroraBackground
+import com.expensetracker.app.ui.theme.ScreenEdgePadding
+
+sealed class BottomNavItem(
+    val route: String,
+    val icon: ImageVector,
+    val label: String
+) {
+    data object Home : BottomNavItem("home", Icons.Default.Home, "Home")
+    data object Ledger : BottomNavItem("ledger", Icons.AutoMirrored.Filled.List, "Ledger")
+    data object Calendar : BottomNavItem("calendar", Icons.Default.CalendarMonth, "Calendar")
+    data object Analytics : BottomNavItem("analytics", Icons.Default.BarChart, "Analytics")
+    data object Settings : BottomNavItem("settings", Icons.Default.Settings, "Settings")
+}
+
+private val bottomNavItems = listOf(
+    BottomNavItem.Home,
+    BottomNavItem.Ledger,
+    BottomNavItem.Calendar,
+    BottomNavItem.Analytics,
+    BottomNavItem.Settings
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainNavigation(
+    darkThemeEnabled: Boolean,
+    onDarkThemeChange: (Boolean) -> Unit
+) {
+    val navController = rememberNavController()
+
+    AuroraBackground {
+        Scaffold(
+            containerColor = Color.Transparent,
+            bottomBar = {
+                Surface(
+                    modifier = Modifier.padding(horizontal = ScreenEdgePadding, vertical = 10.dp),
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+                    ),
+                    shadowElevation = 6.dp
+                ) {
+                    NavigationBar(
+                        containerColor = Color.Transparent,
+                        tonalElevation = 0.dp
+                    ) {
+                        val navBackStackEntry by navController.currentBackStackEntryAsState()
+                        val currentDestination = navBackStackEntry?.destination
+
+                        bottomNavItems.forEach { item ->
+                            val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+                            NavigationBarItem(
+                                icon = {
+                                    Icon(
+                                        item.icon,
+                                        contentDescription = item.label,
+                                        modifier = Modifier
+                                            .background(
+                                                color = if (selected) {
+                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                                                } else {
+                                                    Color.Transparent
+                                                },
+                                                shape = CircleShape
+                                            )
+                                            .padding(8.dp)
+                                    )
+                                },
+                                label = { Text(item.label) },
+                                selected = selected,
+                                colors = NavigationBarItemDefaults.colors(
+                                    indicatorColor = Color.Transparent,
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                onClick = {
+                                    navController.navigate(item.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        ) { innerPadding ->
+            NavHost(
+                navController = navController,
+                startDestination = Screen.Home.route,
+                modifier = Modifier.padding(innerPadding)
+            ) {
+                composable(Screen.Home.route) {
+                    HomeScreen(
+                        onAddTransaction = { navController.navigate(Screen.AddTransaction.route) },
+                        onViewLedger = { navController.navigate(Screen.Ledger.route) }
+                    )
+                }
+                composable(Screen.Ledger.route) {
+                    LedgerScreen(
+                        onTransactionClick = { /* Navigate to detail */ }
+                    )
+                }
+                composable(Screen.Calendar.route) {
+                    CalendarScreen(
+                        onDayClick = { /* Navigate to day detail */ }
+                    )
+                }
+                composable(Screen.Analytics.route) {
+                    AnalyticsScreen()
+                }
+                composable(Screen.Settings.route) {
+                    SettingsScreen(
+                        onOpenCaptureInbox = { navController.navigate(Screen.CaptureInbox.route) },
+                        isDarkModeEnabled = darkThemeEnabled,
+                        onDarkModeChange = onDarkThemeChange
+                    )
+                }
+                composable(Screen.CaptureInbox.route) {
+                    CaptureReviewScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+                composable(Screen.AddTransaction.route) {
+                    AddEditTransactionScreen(
+                        transactionId = null,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+                composable(
+                    route = Screen.EditTransaction.route,
+                    arguments = listOf(navArgument("transactionId") { type = NavType.LongType })
+                ) { backStackEntry ->
+                    val transactionId = backStackEntry.arguments?.getLong("transactionId")
+                    AddEditTransactionScreen(
+                        transactionId = transactionId,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+            }
+        }
+    }
+}
