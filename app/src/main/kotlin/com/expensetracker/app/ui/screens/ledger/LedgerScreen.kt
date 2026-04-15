@@ -1,7 +1,10 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.expensetracker.app.ui.screens.ledger
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Receipt
@@ -60,6 +64,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun LedgerScreen(
     onTransactionClick: (Long) -> Unit,
+    onNavigateBack: (() -> Unit)? = null,
     viewModel: LedgerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -79,10 +84,21 @@ fun LedgerScreen(
                     Column {
                         Text("Ledger")
                         Text(
-                            text = "All transactions in one place",
+                            text = if (onNavigateBack != null) {
+                                "All transactions in one place"
+                            } else {
+                                "Browse and edit your complete history"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                },
+                navigationIcon = {
+                    onNavigateBack?.let { navigateBack ->
+                        IconButton(onClick = navigateBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -122,26 +138,28 @@ fun LedgerScreen(
                             "Showing results for \"${uiState.searchQuery}\""
                         }
                     )
-                    Row(
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        maxItemsInEachRow = 3
                     ) {
                         StatBadge(
                             label = "Expense",
                             value = formatAmount(expenseTotal),
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(0.31f),
                             accent = MaterialTheme.colorScheme.error
                         )
                         StatBadge(
                             label = "Income",
                             value = formatAmount(incomeTotal),
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(0.31f),
                             accent = MaterialTheme.colorScheme.secondary
                         )
                         StatBadge(
                             label = "View",
                             value = if (uiState.searchQuery.isBlank()) "All" else "Filtered",
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(0.31f),
                             accent = MaterialTheme.colorScheme.tertiary
                         )
                     }
@@ -338,14 +356,16 @@ fun FilterSheet(
             )
         }
 
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            maxItemsInEachRow = 2
         ) {
             OutlinedButton(
                 onClick = onReset,
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxWidth(0.48f)
                     .appButtonSizing()
                     .testTag("ledger_filter_reset")
             ) {
@@ -354,7 +374,7 @@ fun FilterSheet(
             Button(
                 onClick = onApply,
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxWidth(0.48f)
                     .appButtonSizing()
                     .testTag("ledger_filter_apply")
             ) {

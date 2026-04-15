@@ -128,15 +128,44 @@ fun GlassPanel(
                 MaterialTheme.shapes.medium
             ),
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-        shadowElevation = 4.dp,
-        tonalElevation = 1.dp
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+        shadowElevation = 8.dp,
+        tonalElevation = 0.dp
     ) {
-        Column(
-            modifier = Modifier.padding(contentPadding),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            content = content
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                            accent.copy(alpha = 0.05f),
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f)
+                        )
+                    )
+                )
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 32.dp, y = (-24).dp)
+                    .size(124.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                accent.copy(alpha = 0.16f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+            Column(
+                modifier = Modifier.padding(contentPadding),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                content = content
+            )
+        }
     }
 }
 
@@ -192,18 +221,29 @@ fun StatBadge(
     Surface(
         modifier = modifier.defaultMinSize(minWidth = 88.dp, minHeight = 76.dp),
         shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.12f))
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.16f))
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(accent)
+                )
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleMedium,

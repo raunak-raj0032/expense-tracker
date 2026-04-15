@@ -1,8 +1,10 @@
 package com.expensetracker.app.ui.screens.analytics
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,8 +16,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingFlat
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,8 +34,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.expensetracker.app.ui.screens.home.formatAmount
@@ -42,6 +48,7 @@ import com.expensetracker.app.ui.theme.SectionHeader
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -178,6 +185,7 @@ fun MonthSelector(
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun SummaryCard(
     totalExpense: Long,
@@ -190,83 +198,262 @@ fun SummaryCard(
         modifier = Modifier.fillMaxWidth(),
         accent = MaterialTheme.colorScheme.secondary
     ) {
-        Row(
+        SectionHeader(
+            eyebrow = "Overview",
+            title = "Monthly balance",
+            subtitle = "Spend, income, and trend signals at a glance"
+        )
+
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            maxItemsInEachRow = 2
         ) {
-            Surface(
-                modifier = Modifier.weight(1f),
-                shape = MaterialTheme.shapes.small,
-                color = MaterialTheme.colorScheme.error.copy(alpha = 0.11f)
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Total Spent", style = MaterialTheme.typography.bodySmall)
-                    Text(
-                        formatAmount(totalExpense),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.error
-                    )
+            SummaryMetricTile(
+                title = "Total Spent",
+                amount = formatAmount(totalExpense),
+                accent = MaterialTheme.colorScheme.error,
+                icon = Icons.AutoMirrored.Filled.TrendingDown,
+                supporting = if (previousExpense > 0L) "Compared with last month" else "Current month spend",
+                chip = {
                     TrendChip(
                         amount = totalExpense,
                         previous = previousExpense,
                         isExpense = true
                     )
                 }
-            }
+            )
 
-            Surface(
-                modifier = Modifier.weight(1f),
-                shape = MaterialTheme.shapes.small,
-                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.11f)
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Total Income", style = MaterialTheme.typography.bodySmall)
-                    Text(
-                        formatAmount(totalIncome),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
+            SummaryMetricTile(
+                title = "Total Income",
+                amount = formatAmount(totalIncome),
+                accent = MaterialTheme.colorScheme.secondary,
+                icon = Icons.AutoMirrored.Filled.TrendingUp,
+                supporting = if (previousIncome > 0L) "Compared with last month" else "Current month income",
+                chip = {
                     TrendChip(
                         amount = totalIncome,
                         previous = previousIncome,
                         isExpense = false
                     )
                 }
-            }
+            )
         }
 
-        Surface(
+        NetFlowHeroCard(
+            totalExpense = totalExpense,
+            totalIncome = totalIncome,
+            netFlow = netFlow
+        )
+    }
+}
+
+@Composable
+private fun SummaryMetricTile(
+    title: String,
+    amount: String,
+    accent: Color,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    supporting: String,
+    chip: @Composable () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(0.48f),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            accent.copy(alpha = 0.16f)
+        ),
+        shadowElevation = 2.dp
+    ) {
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.small,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                accent.copy(alpha = 0.16f),
+                                Color.Transparent,
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
+                            )
+                        )
+                    )
+                    .padding(14.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(accent.copy(alpha = 0.16f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = accent,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        chip()
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = amount,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = accent,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = supporting,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NetFlowHeroCard(
+    totalExpense: Long,
+    totalIncome: Long,
+    netFlow: Long
+) {
+    val spendRatio = if (totalIncome > 0L) {
+        (totalExpense.toFloat() / totalIncome.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+    val spendRateLabel = if (totalIncome > 0L) {
+        "${(spendRatio * 100f).roundToInt()}% of income spent"
+    } else if (totalExpense > 0L) {
+        "Log income to compare spend rate"
+    } else {
+        "Add transactions to build a signal"
+    }
+    val flowAccent = if (netFlow >= 0) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.error
+    }
+    val flowStatus = when {
+        netFlow > 0L -> "Positive balance"
+        netFlow < 0L -> "Overspending"
+        else -> "Balanced"
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            flowAccent.copy(alpha = 0.16f)
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            flowAccent.copy(alpha = 0.14f),
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        )
+                    )
+                )
+                .padding(16.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "Net Flow",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${if (netFlow >= 0) "+" else "-"}${formatAmount(abs(netFlow))}",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = flowAccent
+                        )
+                    }
+                    NetFlowStatusPill(
+                        label = flowStatus,
+                        accent = flowAccent
+                    )
+                }
                 Text(
-                    text = "Net Flow",
+                    text = spendRateLabel,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Text(
-                    text = "${if (netFlow >= 0) "+" else "-"}${formatAmount(abs(netFlow))}",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (netFlow >= 0) {
-                        MaterialTheme.colorScheme.primary
+                GlowProgressBar(
+                    progress = spendRatio,
+                    accent = if (netFlow >= 0) {
+                        MaterialTheme.colorScheme.tertiary
                     } else {
                         MaterialTheme.colorScheme.error
-                    }
-                )
-                GlowProgressBar(
-                    progress = if (totalIncome > 0L) {
-                        (totalExpense.toFloat() / totalIncome.toFloat()).coerceIn(0f, 1f)
-                    } else {
-                        0f
                     },
-                    accent = MaterialTheme.colorScheme.tertiary
+                    height = 12.dp
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun NetFlowStatusPill(
+    label: String,
+    accent: Color
+) {
+    Surface(
+        color = accent.copy(alpha = 0.12f),
+        shape = CircleShape
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(accent, CircleShape)
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = accent
+            )
         }
     }
 }
@@ -277,29 +464,83 @@ fun TrendChip(
     previous: Long,
     isExpense: Boolean
 ) {
-    val change = if (previous > 0) ((amount - previous).toFloat() / previous * 100) else 0f
-    val isPositive = change > 0
+    if (previous <= 0L) {
+        val accent = when {
+            amount == 0L -> MaterialTheme.colorScheme.outline
+            isExpense -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.secondary
+        }
+        val label = when {
+            amount == 0L -> "No prior"
+            isExpense -> "New spend"
+            else -> "New income"
+        }
+
+        Surface(
+            color = accent.copy(alpha = 0.12f),
+            shape = CircleShape
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = if (amount == 0L) Icons.AutoMirrored.Filled.TrendingFlat else Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = accent
+                )
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = accent
+                )
+            }
+        }
+        return
+    }
+
+    val change = ((amount - previous).toFloat() / previous * 100f)
+    val isPositive = change > 0f
     val accent = if (isExpense == isPositive) {
         MaterialTheme.colorScheme.error
     } else {
         MaterialTheme.colorScheme.secondary
     }
+    val descriptor = when {
+        abs(change) < 0.1f -> "Flat"
+        isPositive && isExpense -> "Higher"
+        isPositive -> "Up"
+        isExpense -> "Lower"
+        else -> "Down"
+    }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    Surface(
+        color = accent.copy(alpha = 0.12f),
+        shape = CircleShape
     ) {
-        Icon(
-            imageVector = if (isPositive) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
-            contentDescription = null,
-            modifier = Modifier.size(14.dp),
-            tint = accent
-        )
-        Text(
-            text = "${String.format("%.1f", abs(change))}%",
-            style = MaterialTheme.typography.labelLarge,
-            color = accent
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = when {
+                    abs(change) < 0.1f -> Icons.AutoMirrored.Filled.TrendingFlat
+                    isPositive -> Icons.AutoMirrored.Filled.TrendingUp
+                    else -> Icons.AutoMirrored.Filled.TrendingDown
+                },
+                contentDescription = null,
+                modifier = Modifier.size(12.dp),
+                tint = accent
+            )
+            Text(
+                text = "${String.format("%.1f", abs(change))}% $descriptor",
+                style = MaterialTheme.typography.labelLarge,
+                color = accent
+            )
+        }
     }
 }
 

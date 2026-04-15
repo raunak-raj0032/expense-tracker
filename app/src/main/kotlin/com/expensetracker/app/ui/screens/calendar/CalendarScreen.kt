@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.expensetracker.app.ui.screens.calendar
 
 import androidx.compose.foundation.background
@@ -5,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.expensetracker.app.core.model.CalendarDay
@@ -79,6 +83,7 @@ private enum class CalendarViewMode {
 @Composable
 fun CalendarScreen(
     onDayClick: (LocalDate) -> Unit,
+    onTransactionClick: (Long) -> Unit,
     viewModel: CalendarViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -281,7 +286,7 @@ fun CalendarScreen(
                 items(uiState.transactionsForSelectedDate) { transaction ->
                     TransactionListItem(
                         transaction = transaction,
-                        onClick = { }
+                        onClick = { onTransactionClick(transaction.id) }
                     )
                 }
             }
@@ -377,25 +382,33 @@ private fun CalendarModeSelector(
         accent = MaterialTheme.colorScheme.tertiary,
         contentPadding = PaddingValues(14.dp)
     ) {
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            maxItemsInEachRow = 3
         ) {
             CalendarViewMode.entries.forEach { mode ->
                 FilterChip(
                     selected = viewMode == mode,
                     onClick = { onViewModeChange(mode) },
-                    label = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                    label = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                    modifier = Modifier.fillMaxWidth(0.31f)
                 )
             }
-            Spacer(modifier = Modifier.weight(1f))
             OutlinedButton(
                 onClick = onOpenCustomPicker,
-                modifier = Modifier.appButtonSizing()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .appButtonSizing()
             ) {
                 Icon(Icons.Default.DateRange, contentDescription = null)
                 Spacer(modifier = Modifier.size(6.dp))
-                Text("Select Range")
+                Text(
+                    text = "Select Range",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
@@ -423,27 +436,29 @@ private fun PeriodOverviewCard(
             title = "${rangeStart.format(DateTimeFormatter.ofPattern("dd MMM"))} - ${rangeEnd.format(DateTimeFormatter.ofPattern("dd MMM yyyy"))}",
             subtitle = "Periodical data breakdown"
         )
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            maxItemsInEachRow = 3
         ) {
             SummaryPill(
                 label = "Spent",
                 value = formatAmount(expenseTotal),
                 accent = MaterialTheme.colorScheme.error,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth(0.31f)
             )
             SummaryPill(
                 label = "Income",
                 value = formatAmount(incomeTotal),
                 accent = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth(0.31f)
             )
             SummaryPill(
                 label = "Events",
                 value = transactionCount.toString(),
                 accent = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth(0.31f)
             )
         }
     }
@@ -686,27 +701,29 @@ private fun DaySummaryCard(
             title = date.format(DateTimeFormatter.ofPattern("EEEE, MMMM dd")),
             subtitle = "Daily pulse overview"
         )
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            maxItemsInEachRow = 3
         ) {
             SummaryPill(
                 label = "Spent",
                 value = formatAmount(expenseTotal),
                 accent = MaterialTheme.colorScheme.error,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth(0.31f)
             )
             SummaryPill(
                 label = "Income",
                 value = formatAmount(incomeTotal),
                 accent = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth(0.31f)
             )
             SummaryPill(
                 label = "Transactions",
                 value = transactionCount.toString(),
                 accent = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth(0.31f)
             )
         }
     }
