@@ -93,6 +93,7 @@ dependencies {
     ksp("androidx.hilt:hilt-compiler:1.1.0")
 
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

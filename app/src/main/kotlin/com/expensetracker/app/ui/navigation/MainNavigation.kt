@@ -32,10 +32,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.expensetracker.app.ui.screens.budget.BudgetSetupScreen
 import com.expensetracker.app.ui.screens.analytics.AnalyticsScreen
 import com.expensetracker.app.ui.screens.calendar.CalendarScreen
 import com.expensetracker.app.ui.screens.capture.CaptureReviewScreen
 import com.expensetracker.app.ui.screens.home.HomeScreen
+import com.expensetracker.app.ui.screens.imports.StatementImportScreen
 import com.expensetracker.app.ui.screens.ledger.LedgerScreen
 import com.expensetracker.app.ui.screens.settings.SettingsScreen
 import com.expensetracker.app.ui.screens.transaction.AddEditTransactionScreen
@@ -69,66 +71,70 @@ fun MainNavigation(
     onDarkThemeChange: (Boolean) -> Unit
 ) {
     val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+    val shouldShowBottomBar = bottomNavItems.any { item ->
+        currentDestination?.hierarchy?.any { it.route == item.route } == true
+    }
 
     AuroraBackground {
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
-                Surface(
-                    modifier = Modifier.padding(horizontal = ScreenEdgePadding, vertical = 10.dp),
-                    shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
-                    ),
-                    shadowElevation = 6.dp
-                ) {
-                    NavigationBar(
-                        containerColor = Color.Transparent,
-                        tonalElevation = 0.dp
+                if (shouldShowBottomBar) {
+                    Surface(
+                        modifier = Modifier.padding(horizontal = ScreenEdgePadding, vertical = 10.dp),
+                        shape = MaterialTheme.shapes.large,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+                        ),
+                        shadowElevation = 6.dp
                     ) {
-                        val navBackStackEntry by navController.currentBackStackEntryAsState()
-                        val currentDestination = navBackStackEntry?.destination
-
-                        bottomNavItems.forEach { item ->
-                            val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
-                            NavigationBarItem(
-                                icon = {
-                                    Icon(
-                                        item.icon,
-                                        contentDescription = item.label,
-                                        modifier = Modifier
-                                            .background(
-                                                color = if (selected) {
-                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                                                } else {
-                                                    Color.Transparent
-                                                },
-                                                shape = CircleShape
-                                            )
-                                            .padding(8.dp)
-                                    )
-                                },
-                                label = { Text(item.label) },
-                                selected = selected,
-                                colors = NavigationBarItemDefaults.colors(
-                                    indicatorColor = Color.Transparent,
-                                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                ),
-                                onClick = {
-                                    navController.navigate(item.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = true
+                        NavigationBar(
+                            containerColor = Color.Transparent,
+                            tonalElevation = 0.dp
+                        ) {
+                            bottomNavItems.forEach { item ->
+                                val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+                                NavigationBarItem(
+                                    icon = {
+                                        Icon(
+                                            item.icon,
+                                            contentDescription = item.label,
+                                            modifier = Modifier
+                                                .background(
+                                                    color = if (selected) {
+                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                                                    } else {
+                                                        Color.Transparent
+                                                    },
+                                                    shape = CircleShape
+                                                )
+                                                .padding(8.dp)
+                                        )
+                                    },
+                                    label = { Text(item.label) },
+                                    selected = selected,
+                                    colors = NavigationBarItemDefaults.colors(
+                                        indicatorColor = Color.Transparent,
+                                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                                        selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    onClick = {
+                                        navController.navigate(item.route) {
+                                            popUpTo(navController.graph.findStartDestination().id) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
                                         }
-                                        launchSingleTop = true
-                                        restoreState = true
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
@@ -142,17 +148,36 @@ fun MainNavigation(
                 composable(Screen.Home.route) {
                     HomeScreen(
                         onAddTransaction = { navController.navigate(Screen.AddTransaction.route) },
-                        onViewLedger = { navController.navigate(Screen.Ledger.route) }
+                        onViewLedger = { navController.navigate(Screen.LedgerDetail.route) },
+                        onOpenBudget = { navController.navigate(Screen.Budgets.route) },
+                        onOpenCaptureInbox = { navController.navigate(Screen.CaptureInbox.route) },
+                        onOpenStatementImport = { navController.navigate(Screen.Import.route) },
+                        onTransactionClick = { transactionId ->
+                            navController.navigate(Screen.EditTransaction.createRoute(transactionId))
+                        }
                     )
                 }
                 composable(Screen.Ledger.route) {
                     LedgerScreen(
-                        onTransactionClick = { /* Navigate to detail */ }
+                        onTransactionClick = { transactionId ->
+                            navController.navigate(Screen.EditTransaction.createRoute(transactionId))
+                        }
+                    )
+                }
+                composable(Screen.LedgerDetail.route) {
+                    LedgerScreen(
+                        onTransactionClick = { transactionId ->
+                            navController.navigate(Screen.EditTransaction.createRoute(transactionId))
+                        },
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
                 composable(Screen.Calendar.route) {
                     CalendarScreen(
-                        onDayClick = { /* Navigate to day detail */ }
+                        onDayClick = { /* Stay on current day */ },
+                        onTransactionClick = { transactionId ->
+                            navController.navigate(Screen.EditTransaction.createRoute(transactionId))
+                        }
                     )
                 }
                 composable(Screen.Analytics.route) {
@@ -161,12 +186,24 @@ fun MainNavigation(
                 composable(Screen.Settings.route) {
                     SettingsScreen(
                         onOpenCaptureInbox = { navController.navigate(Screen.CaptureInbox.route) },
+                        onOpenBudget = { navController.navigate(Screen.Budgets.route) },
+                        onOpenStatementImport = { navController.navigate(Screen.Import.route) },
                         isDarkModeEnabled = darkThemeEnabled,
                         onDarkModeChange = onDarkThemeChange
                     )
                 }
+                composable(Screen.Budgets.route) {
+                    BudgetSetupScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
                 composable(Screen.CaptureInbox.route) {
                     CaptureReviewScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+                composable(Screen.Import.route) {
+                    StatementImportScreen(
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }

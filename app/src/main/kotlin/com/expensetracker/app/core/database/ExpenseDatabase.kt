@@ -31,4 +31,5 @@ abstract class ExpenseDatabase : RoomDatabase() {
     abstract fun captureEventDao(): CaptureEventDao
     abstract fun ruleDao(): RuleDao
     abstract fun transactionTagDao(): TransactionTagDao
+    abstract fun budgetDao(): BudgetDao
 }

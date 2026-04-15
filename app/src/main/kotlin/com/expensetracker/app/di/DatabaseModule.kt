@@ -113,4 +113,7 @@ object DatabaseModule {
 
     @Provides
     fun provideTransactionTagDao(db: ExpenseDatabase): TransactionTagDao = db.transactionTagDao()
+
+    @Provides
+    fun provideBudgetDao(db: ExpenseDatabase): BudgetDao = db.budgetDao()
 }

@@ -12,12 +12,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.math.RoundingMode
 import java.time.LocalDateTime
 import javax.inject.Inject
 
 data class AddEditTransactionUiState(
+    val transactionId: Long? = null,
     val transactionType: TransactionType = TransactionType.EXPENSE,
     val amount: String = "",
     val accountId: Long = 0,
@@ -31,6 +33,7 @@ data class AddEditTransactionUiState(
     val categories: List<Category> = emptyList(),
     val tags: List<Tag> = emptyList(),
     val isSaved: Boolean = false,
+    val isDeleted: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null
 )
@@ -44,6 +47,7 @@ class AddEditTransactionViewModel @Inject constructor(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AddEditTransactionUiState())
     val uiState: StateFlow<AddEditTransactionUiState> = _uiState.asStateFlow()
+    private var categoryJob: Job? = null
 
     init {
         loadData()
@@ -64,9 +68,7 @@ class AddEditTransactionViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            categoryRepository.observeExpenseCategories().collect { categories ->
-                _uiState.update { it.copy(categories = categories) }
-            }
+            observeCategoriesFor(TransactionType.EXPENSE)
         }
 
         viewModelScope.launch {
@@ -83,8 +85,9 @@ class AddEditTransactionViewModel @Inject constructor(
                 val tagIds = tagRepository.getTagIdsForTransaction(id)
                 _uiState.update {
                     it.copy(
+                        transactionId = tx.id,
                         transactionType = tx.type,
-                        amount = (tx.amountMinor / 100).toString(),
+                        amount = formatAmount(tx.amountMinor),
                         accountId = tx.accountId,
                         categoryId = tx.categoryId,
                         counterpartyAccountId = tx.counterpartyAccountId,
@@ -100,16 +103,7 @@ class AddEditTransactionViewModel @Inject constructor(
 
     fun updateTransactionType(type: TransactionType) {
         _uiState.update { it.copy(transactionType = type) }
-        viewModelScope.launch {
-            val categories = when (type) {
-                TransactionType.EXPENSE, TransactionType.REFUND -> categoryRepository.observeExpenseCategories()
-                TransactionType.INCOME -> categoryRepository.observeIncomeCategories()
-                TransactionType.TRANSFER -> categoryRepository.observeTree()
-            }
-            categories.collect { cats ->
-                _uiState.update { it.copy(categories = cats) }
-            }
-        }
+        observeCategoriesFor(type)
     }
 
     fun updateAmount(amount: String) {
@@ -151,7 +145,7 @@ class AddEditTransactionViewModel @Inject constructor(
                 ?: 0L
 
             val transaction = Transaction(
-                id = 0,
+                id = state.transactionId ?: 0,
                 type = state.transactionType,
                 amountMinor = amountMinor,
                 transactionTime = state.transactionTime,
@@ -166,10 +160,50 @@ class AddEditTransactionViewModel @Inject constructor(
             )
 
             try {
-                transactionRepository.insert(transaction)
+                if (state.transactionId != null) {
+                    transactionRepository.update(transaction)
+                } else {
+                    transactionRepository.insert(transaction)
+                }
                 _uiState.update { it.copy(isSaved = true) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun deleteTransaction() {
+        viewModelScope.launch {
+            val transactionId = _uiState.value.transactionId ?: return@launch
+            try {
+                transactionRepository.delete(transactionId)
+                _uiState.update { it.copy(isDeleted = true) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    private fun formatAmount(amountMinor: Long): String {
+        val whole = amountMinor / 100
+        val fraction = (amountMinor % 100).toString().padStart(2, '0')
+        return if (fraction == "00") {
+            whole.toString()
+        } else {
+            "$whole.$fraction"
+        }
+    }
+
+    private fun observeCategoriesFor(type: TransactionType) {
+        categoryJob?.cancel()
+        categoryJob = viewModelScope.launch {
+            val categories = when (type) {
+                TransactionType.EXPENSE, TransactionType.REFUND -> categoryRepository.observeExpenseCategories()
+                TransactionType.INCOME -> categoryRepository.observeIncomeCategories()
+                TransactionType.TRANSFER -> categoryRepository.observeTree()
+            }
+            categories.collect { cats ->
+                _uiState.update { it.copy(categories = cats) }
             }
         }
     }

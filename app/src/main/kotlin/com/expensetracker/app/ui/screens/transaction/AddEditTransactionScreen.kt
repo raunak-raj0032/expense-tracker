@@ -2,6 +2,8 @@ package com.expensetracker.app.ui.screens.transaction
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,7 +19,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -65,6 +70,7 @@ fun AddEditTransactionScreen(
     viewModel: AddEditTransactionViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(transactionId) {
         transactionId?.let { viewModel.loadTransaction(it) }
@@ -72,6 +78,12 @@ fun AddEditTransactionScreen(
 
     LaunchedEffect(uiState.isSaved) {
         if (uiState.isSaved) {
+            onNavigateBack()
+        }
+    }
+
+    LaunchedEffect(uiState.isDeleted) {
+        if (uiState.isDeleted) {
             onNavigateBack()
         }
     }
@@ -96,6 +108,11 @@ fun AddEditTransactionScreen(
                     }
                 },
                 actions = {
+                    if (transactionId != null) {
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete Transaction")
+                        }
+                    }
                     TextButton(
                         onClick = { viewModel.saveTransaction() },
                         enabled = uiState.amount.isNotEmpty()
@@ -212,21 +229,68 @@ fun AddEditTransactionScreen(
                         .appButtonSizing()
                         .testTag("transaction_save_button")
                 ) {
-                    Text("Save Transaction")
+                    Text(if (transactionId == null) "Save Transaction" else "Save Changes")
+                }
+            }
+
+            if (transactionId != null) {
+                item {
+                    TextButton(
+                        onClick = { showDeleteDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .appButtonSizing(),
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(Icons.Default.DeleteOutline, contentDescription = null)
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text("Delete Entry")
+                    }
                 }
             }
         }
     }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Transaction?") },
+            text = { Text("This will remove the entry from your ledger.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        viewModel.deleteTransaction()
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TransactionTypeSelector(
     selectedType: TransactionType,
     onTypeChange: (TransactionType) -> Unit
 ) {
-    Row(
+    FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        maxItemsInEachRow = 2
     ) {
         TransactionType.entries.forEach { type ->
             FilterChip(
@@ -238,7 +302,7 @@ fun TransactionTypeSelector(
                 } else {
                     null
                 },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth(0.48f)
             )
         }
     }

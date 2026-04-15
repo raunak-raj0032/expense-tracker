@@ -2,6 +2,8 @@ package com.expensetracker.app.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expensetracker.app.capture.CaptureEventRepository
+import com.expensetracker.app.core.data.repository.BudgetRepository
 import com.expensetracker.app.core.data.repository.TransactionRepository
 import com.expensetracker.app.core.model.Transaction
 import com.expensetracker.app.core.model.TransactionType
@@ -9,6 +11,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -22,21 +25,25 @@ data class HomeUiState(
     val totalIncome: Long = 0,
     val budgetRemaining: Long? = null,
     val budgetTotal: Long? = null,
+    val budgetName: String? = null,
+    val todayExpense: Long = 0,
+    val todayBudgetAllowance: Long? = null,
     val recentTransactions: List<Transaction> = emptyList(),
     val transactionsThisMonth: Int = 0,
     val activeDays: Int = 0,
     val streakDays: Int = 0,
-    val momentumScore: Int = 0,
-    val focusRank: String = "Getting Started",
-    val missionProgress: Float = 0f,
-    val missionLabel: String = "Log your first transaction to start building your month.",
+    val dayOfMonth: Int = 1,
+    val daysInMonth: Int = 30,
     val netFlow: Long = 0,
+    val openCaptureCount: Int = 0,
     val isLoading: Boolean = false
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val transactionRepository: TransactionRepository
+    private val transactionRepository: TransactionRepository,
+    private val budgetRepository: BudgetRepository,
+    private val captureEventRepository: CaptureEventRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -54,8 +61,14 @@ class HomeViewModel @Inject constructor(
             val month = YearMonth.from(now)
             val startOfMonth = month.atDay(1)
             val endOfMonth = month.atEndOfMonth()
+            val dayOfMonth = now.dayOfMonth
+            val daysInMonth = month.lengthOfMonth()
 
-            transactionRepository.observeForDateRange(startOfMonth, endOfMonth).collect { transactions ->
+            combine(
+                transactionRepository.observeForDateRange(startOfMonth, endOfMonth),
+                budgetRepository.observeMonthlyBudgetFor(month),
+                captureEventRepository.observeOpenCount()
+            ) { transactions, budget, openCaptureCount ->
                 val totalExpense = transactions
                     .filter { it.type == TransactionType.EXPENSE }
                     .sumOf { it.amountMinor }
@@ -68,34 +81,46 @@ class HomeViewModel @Inject constructor(
                 val activeDays = activeDates.size
                 val streakDays = calculateStreak(activeDates)
                 val transactionCount = transactions.size
-                val missionProgress = (transactionCount / 12f).coerceIn(0f, 1f)
-                val momentumScore = (
-                    activeDays * 8 +
-                        transactionCount.coerceAtMost(12) * 4 +
-                        if (totalIncome > 0) 14 else 0 +
-                        if (totalExpense > 0) 10 else 0
-                    ).coerceAtMost(100)
+                val todayExpense = transactions
+                    .filter {
+                        it.type == TransactionType.EXPENSE &&
+                            it.transactionTime.toLocalDate() == now
+                    }
+                    .sumOf { it.amountMinor }
+                val budgetTotal = budget?.amountMinor
+                val budgetRemaining = budgetTotal?.minus(totalExpense)
+                val todayBudgetAllowance = budgetTotal?.let {
+                    budgetAllowanceForDay(
+                        totalMinor = it,
+                        totalDays = daysInMonth,
+                        dayNumber = dayOfMonth
+                    )
+                }
 
                 _uiState.update {
                     it.copy(
                         monthName = month.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
                         totalExpense = totalExpense,
                         totalIncome = totalIncome,
+                        budgetTotal = budgetTotal,
+                        budgetRemaining = budgetRemaining,
+                        budgetName = budget?.name,
+                        todayExpense = todayExpense,
+                        todayBudgetAllowance = todayBudgetAllowance,
                         recentTransactions = transactions
                             .sortedByDescending { tx -> tx.transactionTime }
                             .take(10),
                         transactionsThisMonth = transactionCount,
                         activeDays = activeDays,
                         streakDays = streakDays,
-                        momentumScore = momentumScore,
-                        focusRank = rankFor(momentumScore),
-                        missionProgress = missionProgress,
-                        missionLabel = missionLabelFor(transactionCount, streakDays),
+                        dayOfMonth = dayOfMonth,
+                        daysInMonth = daysInMonth,
                         netFlow = totalIncome - totalExpense,
+                        openCaptureCount = openCaptureCount,
                         isLoading = false
                     )
                 }
-            }
+            }.collect { }
         }
     }
 
@@ -113,23 +138,18 @@ class HomeViewModel @Inject constructor(
         return streak
     }
 
-    private fun rankFor(score: Int): String {
-        return when {
-            score >= 85 -> "Excellent"
-            score >= 65 -> "Strong"
-            score >= 40 -> "Steady"
-            score >= 15 -> "Building"
-            else -> "Getting Started"
+    private fun budgetAllowanceForDay(
+        totalMinor: Long,
+        totalDays: Int,
+        dayNumber: Int
+    ): Long {
+        if (totalMinor <= 0 || totalDays <= 0) {
+            return 0
         }
-    }
 
-    private fun missionLabelFor(transactionCount: Int, streakDays: Int): String {
-        return when {
-            transactionCount == 0 -> "Log your first transaction to start building your month."
-            streakDays >= 5 -> "Nice consistency. Keep your streak going."
-            transactionCount < 5 -> "A few more entries will make your monthly view more useful."
-            transactionCount < 12 -> "You are building a solid picture of your spending."
-            else -> "Great coverage this month. Your dashboard is well populated."
-        }
+        val safeDay = dayNumber.coerceIn(1, totalDays)
+        val basePerDay = totalMinor / totalDays
+        val remainder = totalMinor % totalDays
+        return basePerDay + if (safeDay.toLong() <= remainder) 1 else 0
     }
 }

@@ -62,6 +62,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     onOpenCaptureInbox: () -> Unit = {},
+    onOpenBudget: () -> Unit = {},
+    onOpenStatementImport: () -> Unit = {},
     isDarkModeEnabled: Boolean = true,
     onDarkModeChange: (Boolean) -> Unit = {}
 ) {
@@ -194,7 +196,7 @@ fun SettingsScreen(
                     icon = Icons.Default.Savings,
                     title = "Budget",
                     subtitle = "Set monthly budgets",
-                    onClick = { showPrototypeMessage("Budget") }
+                    onClick = onOpenBudget
                 )
             }
 
@@ -202,9 +204,9 @@ fun SettingsScreen(
             item {
                 SettingsItem(
                     icon = Icons.Default.Upload,
-                    title = "Export",
-                    subtitle = "Export to CSV",
-                    onClick = { showPrototypeMessage("Export") }
+                    title = "Statements & CSV Import",
+                    subtitle = "Parse bank or card statements into your ledger",
+                    onClick = onOpenStatementImport
                 )
             }
             item {

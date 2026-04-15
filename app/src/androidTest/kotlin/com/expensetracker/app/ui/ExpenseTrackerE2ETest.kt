@@ -32,6 +32,20 @@ class ExpenseTrackerE2ETest {
         val nextMonthLabel = YearMonth.now().plusMonths(1).format(monthFormatter)
 
         waitForText("Expense Tracker")
+        composeRule.onNodeWithText("View Ledger").performClick()
+        waitForText("Ledger")
+        composeRule.onNodeWithContentDescription("Back").performClick()
+        waitForText("Expense Tracker")
+
+        composeRule.onNodeWithTag("home_action_budget").performClick()
+        waitForText("Budget")
+        composeRule.onNodeWithContentDescription("Close").performClick()
+        waitForText("Expense Tracker")
+
+        composeRule.onNodeWithTag("home_action_statement").performClick()
+        waitForText("Statement Import")
+        composeRule.onNodeWithContentDescription("Back").performClick()
+        waitForText("Expense Tracker")
 
         composeRule.onNodeWithContentDescription("Add Transaction").performClick()
         waitForText("Add Transaction")
@@ -48,7 +62,6 @@ class ExpenseTrackerE2ETest {
         composeRule.onNodeWithText("Save").performClick()
 
         waitForText("Expense Tracker")
-        waitForText("lunch")
         waitForText("123.45", substring = true)
 
         composeRule.onNodeWithText("Ledger").performClick()
@@ -107,7 +120,7 @@ class ExpenseTrackerE2ETest {
         composeRule.onNodeWithTag("settings_list").performScrollToNode(hasText("SMS & Notification Capture"))
         composeRule.onNodeWithTag("settings_capture_inbox").performClick()
         waitForText("Capture Inbox")
-        waitForText("Import Recent SMS")
+        waitForText("Import SMS History")
         composeRule.onNodeWithContentDescription("Back").performClick()
         waitForText("Settings")
 
