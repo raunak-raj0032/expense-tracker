@@ -79,7 +79,7 @@ class CaptureEventRepository @Inject constructor(
         )
     }
 
-    suspend fun importRecentSms(limit: Int = 40): Int {
+    suspend fun importRecentSms(limit: Int? = null): Int {
         var importedCount = 0
         val projection = arrayOf(
             Telephony.Sms.ADDRESS,
@@ -99,7 +99,10 @@ class CaptureEventRepository @Inject constructor(
             val dateIndex = cursor.getColumnIndex(Telephony.Sms.DATE)
 
             var processed = 0
-            while (processed < limit && cursor.moveToNext()) {
+            while (cursor.moveToNext()) {
+                if (limit != null && processed >= limit) {
+                    break
+                }
                 val sender = cursor.getString(addressIndex)
                 val body = cursor.getString(bodyIndex) ?: continue
                 val receivedAt = cursor.getLong(dateIndex)
@@ -259,8 +262,12 @@ class CaptureEventRepository @Inject constructor(
         val lower = rawText.lowercase(Locale.ROOT)
 
         val preferred = when {
+            paymentMethod == "Wallet" || lower.contains("amazon pay balance") || lower.contains("wallet balance") ->
+                activeAccounts.firstOrNull { it.type == "WALLET" }
             paymentMethod == "UPI" -> activeAccounts.firstOrNull {
-                it.name.contains("upi", ignoreCase = true) || it.type == "WALLET"
+                it.name.contains("upi", ignoreCase = true) ||
+                    it.type == "WALLET" ||
+                    it.name.contains("wallet", ignoreCase = true)
             }
             paymentMethod == "Bank Transfer" || lower.contains("a/c") || lower.contains("bank") ->
                 activeAccounts.firstOrNull { it.type == "BANK" }
@@ -358,11 +365,18 @@ class CaptureEventRepository @Inject constructor(
             "com.phonepe.app" to "PhonePe",
             "com.paytm.app" to "Paytm",
             "in.org.npci.bhimapp" to "BHIM",
+            "com.dreamplug.androidapp" to "CRED",
+            "in.amazon.mShop.android.shopping" to "Amazon",
+            "com.mobikwik_new" to "MobiKwik",
+            "com.freecharge.android" to "Freecharge",
+            "com.whatsapp" to "WhatsApp",
             "com.axisbank.digibank" to "Axis Bank",
             "com.icici.bank.imobile" to "ICICI Bank",
             "com.hdfcbank.mobilebanking" to "HDFC Bank",
             "com.sbi.lionmobileservice" to "SBI",
-            "com.yesbank" to "YES BANK"
+            "com.yesbank" to "YES BANK",
+            "com.kotak.bank.mobile" to "Kotak",
+            "com.csam.icici.bank.imobile" to "ICICI Bank"
         )
     }
 }

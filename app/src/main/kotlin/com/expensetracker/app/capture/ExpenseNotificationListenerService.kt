@@ -22,11 +22,18 @@ class ExpenseNotificationListenerService : NotificationListenerService() {
             "com.phonepe.app",
             "com.paytm.app",
             "in.org.npci.bhimapp",
+            "com.dreamplug.androidapp",
+            "in.amazon.mShop.android.shopping",
+            "com.mobikwik_new",
+            "com.freecharge.android",
+            "com.whatsapp",
             "com.axisbank.digibank",
             "com.icici.bank.imobile",
             "com.hdfcbank.mobilebanking",
             "com.sbi.lionmobileservice",
-            "com.yesbank"
+            "com.yesbank",
+            "com.kotak.bank.mobile",
+            "com.csam.icici.bank.imobile"
         )
     }
 

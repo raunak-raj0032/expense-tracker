@@ -20,6 +20,14 @@ data class ParseResult(
     val isPeerTransfer: Boolean = false
 )
 
+data class NarrativeInsight(
+    val merchant: String? = null,
+    val reference: String? = null,
+    val paymentMethod: String? = null,
+    val categoryHint: String? = null,
+    val isPeerTransfer: Boolean = false
+)
+
 private data class MerchantHint(
     val canonicalName: String,
     val category: String
@@ -46,57 +54,39 @@ class PaymentMessageParser @Inject constructor() {
 
         val amountMinor = extractAmountMinor(combined)
         val direction = detectDirection(combined)
-        val paymentMethod = detectPaymentMethod(packageName, combined)
 
         if (amountMinor == null || direction == null) {
             return ParseResult()
         }
 
-        val reference = extractReference(combined)
-        val rawParty = extractParty(combined)
-        val merchantHint = rawParty?.let(::classifyMerchant)
-        val fallbackMerchantHint = sender
-            ?.takeIf(::looksMeaningfulSender)
-            ?.let(::classifyMerchant)
-        val merchantName = merchantHint?.canonicalName
-            ?: fallbackMerchantHint?.canonicalName
-            ?: rawParty
-            ?: sender?.takeIf(::looksMeaningfulSender)
-
-        val isPeerTransfer = paymentMethod == "UPI" &&
-            merchantName != null &&
-            merchantHint == null &&
-            looksLikePerson(merchantName)
-
-        val categoryHint = when {
-            direction == TransactionType.INCOME && combined.contains("salary", ignoreCase = true) -> "Salary"
-            merchantHint != null -> merchantHint.category
-            isPeerTransfer -> "Transfer"
-            direction == TransactionType.INCOME && paymentMethod == "UPI" -> "Transfer"
-            else -> null
-        }
+        val insight = inferNarrative(
+            text = combined,
+            packageName = packageName,
+            sender = sender,
+            direction = direction
+        )
 
         val description = buildDescription(
             direction = direction,
-            merchant = merchantName,
-            paymentMethod = paymentMethod,
-            isPeerTransfer = isPeerTransfer
+            merchant = insight.merchant,
+            paymentMethod = insight.paymentMethod,
+            isPeerTransfer = insight.isPeerTransfer
         )
 
         val confidence = calculateConfidence(
-            merchant = merchantName,
-            reference = reference,
-            paymentMethod = paymentMethod,
-            categoryHint = categoryHint,
-            isPeerTransfer = isPeerTransfer
+            merchant = insight.merchant,
+            reference = insight.reference,
+            paymentMethod = insight.paymentMethod,
+            categoryHint = insight.categoryHint,
+            isPeerTransfer = insight.isPeerTransfer
         )
 
         val fingerprint = buildFingerprint(
             amountMinor = amountMinor,
             direction = direction,
-            merchant = merchantName,
-            reference = reference,
-            paymentMethod = paymentMethod,
+            merchant = insight.merchant,
+            reference = insight.reference,
+            paymentMethod = insight.paymentMethod,
             sender = sender,
             packageName = packageName
         )
@@ -105,13 +95,65 @@ class PaymentMessageParser @Inject constructor() {
             isTransaction = true,
             amountMinor = amountMinor,
             direction = direction,
-            merchant = merchantName,
-            reference = reference,
+            merchant = insight.merchant,
+            reference = insight.reference,
             confidence = confidence,
             fingerprint = fingerprint,
+            paymentMethod = insight.paymentMethod,
+            categoryHint = insight.categoryHint,
+            description = description,
+            isPeerTransfer = insight.isPeerTransfer
+        )
+    }
+
+    fun inferNarrative(
+        text: String,
+        packageName: String? = null,
+        sender: String? = null,
+        direction: TransactionType? = null
+    ): NarrativeInsight {
+        val combined = listOfNotNull(sender, text)
+            .joinToString(" ")
+            .normalizeWhitespace()
+        if (combined.isBlank()) {
+            return NarrativeInsight()
+        }
+
+        val paymentMethod = detectPaymentMethod(packageName, combined)
+        val reference = extractReference(combined)
+        val rawParty = extractParty(combined)
+        val rawPartyHint = rawParty?.let(::classifyMerchant)
+        val textHint = classifyMerchant(combined)
+        val fallbackSenderHint = sender
+            ?.takeIf(::looksMeaningfulSender)
+            ?.let(::classifyMerchant)
+        val merchantName = rawPartyHint?.canonicalName
+            ?: textHint?.canonicalName
+            ?: fallbackSenderHint?.canonicalName
+            ?: rawParty
+            ?: sender?.takeIf(::looksMeaningfulSender)
+
+        val isPeerTransfer = (paymentMethod == "UPI" || paymentMethod == "Wallet") &&
+            merchantName != null &&
+            rawPartyHint == null &&
+            textHint == null &&
+            looksLikePerson(merchantName)
+
+        val categoryHint = when {
+            direction == TransactionType.INCOME && combined.contains("salary", ignoreCase = true) -> "Salary"
+            direction == TransactionType.TRANSFER || isWalletTopUp(combined.lowercase(Locale.ROOT)) -> "Transfer"
+            rawPartyHint != null -> rawPartyHint.category
+            textHint != null -> textHint.category
+            isPeerTransfer -> "Transfer"
+            direction == TransactionType.INCOME && paymentMethod == "UPI" -> "Transfer"
+            else -> null
+        }
+
+        return NarrativeInsight(
+            merchant = merchantName,
+            reference = reference,
             paymentMethod = paymentMethod,
             categoryHint = categoryHint,
-            description = description,
             isPeerTransfer = isPeerTransfer
         )
     }
@@ -119,6 +161,7 @@ class PaymentMessageParser @Inject constructor() {
     private fun detectDirection(text: String): TransactionType? {
         val lower = text.lowercase(Locale.ROOT)
         return when {
+            isWalletTopUp(lower) || transferKeywords.any(lower::contains) -> TransactionType.TRANSFER
             incomeKeywords.any(lower::contains) -> TransactionType.INCOME
             expenseKeywords.any(lower::contains) -> TransactionType.EXPENSE
             else -> null
@@ -128,11 +171,12 @@ class PaymentMessageParser @Inject constructor() {
     private fun detectPaymentMethod(packageName: String?, text: String): String? {
         val lower = text.lowercase(Locale.ROOT)
         return when {
+            isWalletTopUp(lower) -> "Wallet"
             packageName != null && upiPackages.contains(packageName) -> "UPI"
             lower.contains("upi") || lower.contains("vpa") -> "UPI"
             lower.contains("debit card") || lower.contains("credit card") || lower.contains(" card ") -> "Card"
             lower.contains("netbanking") || lower.contains("imps") || lower.contains("neft") || lower.contains("rtgs") -> "Bank Transfer"
-            lower.contains("wallet") -> "Wallet"
+            lower.contains("wallet") || lower.contains("amazon pay balance") || lower.contains("wallet balance") -> "Wallet"
             packageName != null && bankPackages.contains(packageName) -> "Bank Transfer"
             else -> null
         }
@@ -296,6 +340,11 @@ class PaymentMessageParser @Inject constructor() {
         return normalized.length >= 3 && normalized !in genericSenderKeys
     }
 
+    private fun isWalletTopUp(lower: String): Boolean {
+        return walletTopUpKeywords.any(lower::contains) &&
+            (lower.contains("wallet") || lower.contains("balance") || lower.contains("amazon pay"))
+    }
+
     private fun normalizeKey(value: String): String {
         return value.lowercase(Locale.ROOT)
             .replace(Regex("[^a-z0-9]+"), "")
@@ -318,10 +367,12 @@ class PaymentMessageParser @Inject constructor() {
         val partyPatterns = listOf(
             Regex("(?i)paid to\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
             Regex("(?i)sent to\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
+            Regex("(?i)transferred to\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
             Regex("(?i)received from\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
             Regex("(?i)from\\s+([A-Za-z0-9@._&\\- ]{2,50})\\s+(?:via|through|using|on|for)"),
             Regex("(?i)to\\s+([A-Za-z0-9@._&\\- ]{2,50})\\s+(?:via|through|using|on|for|ref|utr|upi)"),
             Regex("(?i)(?:spent|purchase(?:d)?|payment|order)\\s+(?:at|on)\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
+            Regex("(?i)(?:at|towards)\\s+([A-Za-z0-9@._&\\- ]{2,60})\\s+(?:on|using|via|ref|utr|upi|txn)"),
             Regex("(?i)merchant\\s*[:\\-]\\s*([A-Za-z0-9@._&\\- ]{2,50})"),
             Regex("(?i)vpa\\s*[:\\-]\\s*([A-Za-z0-9._\\-]+@[A-Za-z0-9._\\-]+)")
         )
@@ -333,7 +384,12 @@ class PaymentMessageParser @Inject constructor() {
             "sent",
             "purchase",
             "purchased",
-            "withdrawn"
+            "withdrawn",
+            "charged",
+            "payment made",
+            "successful payment",
+            "paid via",
+            "spent at"
         )
 
         val incomeKeywords = listOf(
@@ -343,14 +399,47 @@ class PaymentMessageParser @Inject constructor() {
             "refund",
             "reversed",
             "reversal",
-            "cashback"
+            "cashback",
+            "settled",
+            "paid you"
+        )
+
+        val transferKeywords = listOf(
+            "wallet top up",
+            "wallet top-up",
+            "top up",
+            "top-up",
+            "add money",
+            "added money",
+            "wallet loaded",
+            "added to amazon pay balance",
+            "amazon pay balance loaded",
+            "load money",
+            "balance transfer"
+        )
+
+        val walletTopUpKeywords = listOf(
+            "wallet top up",
+            "wallet top-up",
+            "top up",
+            "top-up",
+            "add money",
+            "added money",
+            "wallet loaded",
+            "balance loaded",
+            "load money"
         )
 
         val upiPackages = setOf(
             "com.google.android.apps.nbu.paisa.provider",
             "com.phonepe.app",
             "com.paytm.app",
-            "in.org.npci.bhimapp"
+            "in.org.npci.bhimapp",
+            "com.dreamplug.androidapp",
+            "in.amazon.mShop.android.shopping",
+            "com.mobikwik_new",
+            "com.freecharge.android",
+            "com.whatsapp"
         )
 
         val bankPackages = setOf(
@@ -358,10 +447,16 @@ class PaymentMessageParser @Inject constructor() {
             "com.icici.bank.imobile",
             "com.hdfcbank.mobilebanking",
             "com.sbi.lionmobileservice",
-            "com.yesbank"
+            "com.yesbank",
+            "com.csam.icici.bank.imobile",
+            "com.kotak.bank.mobile",
+            "com.snapwork.hdfc"
         )
 
         val merchantKeywordToHint = linkedMapOf(
+            "amazonpaybalance" to MerchantHint("Amazon Pay Balance", "Transfer"),
+            "amazonpayments" to MerchantHint("Amazon Pay", "Transfer"),
+            "amazonpay" to MerchantHint("Amazon Pay", "Transfer"),
             "amazon" to MerchantHint("Amazon", "Shopping"),
             "amzn" to MerchantHint("Amazon", "Shopping"),
             "flipkart" to MerchantHint("Flipkart", "Shopping"),
@@ -389,7 +484,12 @@ class PaymentMessageParser @Inject constructor() {
             "bookmyshow" to MerchantHint("BookMyShow", "Entertainment"),
             "hotstar" to MerchantHint("Disney+ Hotstar", "Entertainment"),
             "apollo" to MerchantHint("Apollo", "Health"),
-            "pharmeasy" to MerchantHint("PharmEasy", "Health")
+            "pharmeasy" to MerchantHint("PharmEasy", "Health"),
+            "mobikwik" to MerchantHint("MobiKwik", "Transfer"),
+            "freecharge" to MerchantHint("Freecharge", "Transfer"),
+            "payzapp" to MerchantHint("PayZapp", "Transfer"),
+            "cred" to MerchantHint("CRED", "Transfer"),
+            "whatsapp" to MerchantHint("WhatsApp Pay", "Transfer")
         )
 
         val stopPartyTokens = setOf(
@@ -399,6 +499,7 @@ class PaymentMessageParser @Inject constructor() {
             "a/c",
             "your",
             "wallet",
+            "balance",
             "order",
             "payment",
             "transaction"

@@ -41,14 +41,14 @@ class CaptureReviewViewModel @Inject constructor(
             val message = try {
                 val imported = captureEventRepository.importRecentSms()
                 if (imported > 0) {
-                    "Imported $imported payment message(s) from SMS."
+                    "Imported $imported payment message(s) from your SMS history."
                 } else {
                     "No new payment SMS messages were found."
                 }
             } catch (e: SecurityException) {
-                "SMS access is required before importing recent messages."
+                "SMS access is required before importing message history."
             } catch (e: Exception) {
-                e.message ?: "Unable to import recent SMS right now."
+                e.message ?: "Unable to import SMS history right now."
             }
             _uiState.update {
                 it.copy(

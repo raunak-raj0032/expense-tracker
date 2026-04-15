@@ -37,11 +37,11 @@ class PaymentMessageParserTest {
         assertTrue(result.isTransaction)
         assertEquals(49_900L, result.amountMinor)
         assertEquals(TransactionType.EXPENSE, result.direction)
-        assertEquals("Amazon", result.merchant)
-        assertEquals("Shopping", result.categoryHint)
+        assertEquals("Amazon Pay", result.merchant)
+        assertEquals("Transfer", result.categoryHint)
         assertEquals("UPI", result.paymentMethod)
         assertEquals("123ABC456DEF", result.reference)
-        assertEquals("Paid to Amazon", result.description)
+        assertEquals("Paid to Amazon Pay", result.description)
     }
 
     @Test
@@ -58,5 +58,35 @@ class PaymentMessageParserTest {
         assertEquals("Transfer", result.categoryHint)
         assertEquals("Received from Neha", result.description)
         assertNotNull(result.fingerprint)
+    }
+
+    @Test
+    fun parsesAmazonShoppingPaymentSeparatelyFromWallet() {
+        val result = parser.parse(
+            sender = "AX-AMZPAY",
+            text = "Rs 899 paid to AMAZON using UPI Ref 123456ABCDEF."
+        )
+
+        assertTrue(result.isTransaction)
+        assertEquals(89_900L, result.amountMinor)
+        assertEquals(TransactionType.EXPENSE, result.direction)
+        assertEquals("Amazon", result.merchant)
+        assertEquals("Shopping", result.categoryHint)
+        assertEquals("UPI", result.paymentMethod)
+    }
+
+    @Test
+    fun parsesAmazonPayWalletTopUpAsTransfer() {
+        val result = parser.parse(
+            sender = "VM-AMZPAY",
+            text = "Added money of Rs 500.00 to Amazon Pay balance via UPI Ref 556677889900."
+        )
+
+        assertTrue(result.isTransaction)
+        assertEquals(50_000L, result.amountMinor)
+        assertEquals(TransactionType.TRANSFER, result.direction)
+        assertEquals("Amazon Pay Balance", result.merchant)
+        assertEquals("Transfer", result.categoryHint)
+        assertEquals("Wallet", result.paymentMethod)
     }
 }

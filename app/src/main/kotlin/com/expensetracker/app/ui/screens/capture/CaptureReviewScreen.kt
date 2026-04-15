@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.expensetracker.app.ui.screens.capture
 
 import android.Manifest
@@ -10,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -204,46 +207,50 @@ private fun CaptureAccessCard(
             subtitle = "Import bank, UPI, and shopping messages from SMS, then keep new captures flowing through notifications."
         )
 
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            maxItemsInEachRow = 2
         ) {
             StatusTile(
                 icon = Icons.Default.MarkEmailRead,
                 label = "SMS access",
                 value = if (hasSmsPermission) "Ready" else "Required",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth(0.48f)
             )
             StatusTile(
                 icon = Icons.Default.Notifications,
                 label = "Listener",
                 value = if (notificationAccessEnabled) "Enabled" else "Optional",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth(0.48f)
             )
         }
 
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            maxItemsInEachRow = 2
         ) {
             OutlinedButton(
                 onClick = onGrantSmsAccess,
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxWidth(0.48f)
                     .appButtonSizing()
                     .testTag("capture_request_sms_button")
             ) {
-                Text(if (hasSmsPermission) "Refresh SMS Access" else "Grant SMS Access")
+                Text(if (hasSmsPermission) "Refresh Access" else "Grant Access")
             }
             Button(
                 onClick = onImportRecentSms,
                 enabled = hasSmsPermission && !isImportingSms,
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxWidth(0.48f)
                     .appButtonSizing()
                     .testTag("capture_import_sms_button")
             ) {
-                Text(if (isImportingSms) "Importing..." else "Import Recent SMS")
+                Text(if (isImportingSms) "Importing..." else "Import SMS History")
             }
         }
 
@@ -377,15 +384,17 @@ private fun CaptureSuggestionCard(
             }
         }
 
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            maxItemsInEachRow = 2
         ) {
             Button(
                 onClick = onAddToLedger,
                 enabled = !isBusy,
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxWidth(0.48f)
                     .appButtonSizing()
             ) {
                 Text(if (isBusy) "Working..." else "Add to Ledger")
@@ -394,7 +403,7 @@ private fun CaptureSuggestionCard(
                 onClick = onIgnore,
                 enabled = !isBusy,
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxWidth(0.48f)
                     .appButtonSizing()
             ) {
                 Text("Ignore")
