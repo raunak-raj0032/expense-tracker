@@ -1,6 +1,12 @@
 package com.expensetracker.app.ui.theme
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -27,24 +33,27 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val ScreenEdgePadding = 20.dp
-val AppButtonMinHeight = 56.dp
-
-val CardSpacing = 20.dp
-val SectionSpacing = 24.dp
+// ─── Layout tokens ────────────────────────────────────────────────────────────
+val ScreenEdgePadding  = 20.dp
+val AppButtonMinHeight = 52.dp
+val CardSpacing        = 16.dp
+val SectionSpacing     = 24.dp
+val ItemSpacing        = 10.dp
 
 fun Modifier.appButtonSizing(): Modifier = defaultMinSize(minHeight = AppButtonMinHeight)
 
@@ -55,10 +64,10 @@ data class AdaptiveFlowLayout(
 
 fun TextStyle.financialFigures(
     weight: FontWeight? = null,
-    letterSpacing: TextUnit = (-0.3).sp
+    letterSpacing: TextUnit = (-0.5).sp
 ): TextStyle = copy(
-    fontWeight = weight ?: this.fontWeight,
-    letterSpacing = letterSpacing,
+    fontWeight       = weight ?: this.fontWeight,
+    letterSpacing    = letterSpacing,
     fontFeatureSettings = "tnum"
 )
 
@@ -68,94 +77,132 @@ fun adaptiveFlowLayout(
     spacing: Dp,
     maxColumns: Int
 ): AdaptiveFlowLayout {
-    if (maxWidth <= 0.dp) {
-        return AdaptiveFlowLayout(columns = 1, itemFraction = 1f)
-    }
-
-    val resolvedMaxColumns = maxColumns.coerceAtLeast(1)
-    var columns = resolvedMaxColumns
+    if (maxWidth <= 0.dp) return AdaptiveFlowLayout(1, 1f)
+    val cols = maxColumns.coerceAtLeast(1)
+    var columns = cols
     while (columns > 1) {
         val candidateWidth = (maxWidth - spacing * (columns - 1)) / columns
-        if (candidateWidth >= minItemWidth) {
-            break
-        }
+        if (candidateWidth >= minItemWidth) break
         columns -= 1
     }
-
     val itemWidth = (maxWidth - spacing * (columns - 1)) / columns
     return AdaptiveFlowLayout(
-        columns = columns,
+        columns      = columns,
         itemFraction = (itemWidth / maxWidth).coerceIn(0f, 1f)
     )
 }
 
+// ─── Animated Aurora Background ───────────────────────────────────────────────
 @Composable
 fun AuroraBackground(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit
 ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "aurora")
+
+    val blob1X by infiniteTransition.animateFloat(
+        initialValue = -60f,
+        targetValue  = 40f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(9000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "blob1x"
+    )
+    val blob1Y by infiniteTransition.animateFloat(
+        initialValue = -80f,
+        targetValue  = 20f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(11000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "blob1y"
+    )
+    val blob2X by infiniteTransition.animateFloat(
+        initialValue = 30f,
+        targetValue  = -20f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(13000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "blob2x"
+    )
+    val blob3Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.10f,
+        targetValue  = 0.22f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(7000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "blob3a"
+    )
+
     val background = MaterialTheme.colorScheme.background
-    val surface = MaterialTheme.colorScheme.surface
-    val primary = MaterialTheme.colorScheme.primary
-    val secondary = MaterialTheme.colorScheme.secondary
-    val tertiary = MaterialTheme.colorScheme.tertiary
+    val primary    = MaterialTheme.colorScheme.primary
+    val secondary  = MaterialTheme.colorScheme.secondary
+    val tertiary   = MaterialTheme.colorScheme.tertiary
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        background,
-                        background.copy(alpha = 0.98f),
-                        primary.copy(alpha = 0.04f),
-                        surface
-                    )
-                )
-            )
+            .background(background)
     ) {
+        // Blob 1 — mint, top-left, drifting
         Box(
             modifier = Modifier
-                .offset(x = (-80).dp, y = (-84).dp)
-                .size(260.dp)
-                .clip(CircleShape)
-                .graphicsLayer { rotationZ = -16f }
+                .offset(x = blob1X.dp, y = blob1Y.dp)
+                .size(320.dp)
+                .blur(80.dp)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            primary.copy(alpha = 0.2f),
+                            primary.copy(alpha = 0.18f),
                             Color.Transparent
                         )
                     )
                 )
         )
+        // Blob 2 — cyan, top-right
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .offset(x = 56.dp, y = (-18).dp)
-                .size(184.dp, 224.dp)
-                .clip(RoundedCornerShape(42.dp))
-                .graphicsLayer { rotationZ = 12f }
+                .offset(x = blob2X.dp, y = (-40).dp)
+                .size(260.dp)
+                .blur(90.dp)
                 .background(
-                    Brush.linearGradient(
+                    Brush.radialGradient(
                         colors = listOf(
-                            secondary.copy(alpha = 0.18f),
+                            secondary.copy(alpha = 0.14f),
                             Color.Transparent
                         )
                     )
                 )
         )
+        // Blob 3 — amber, bottom, pulsing
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .offset(x = (-24).dp, y = 86.dp)
-                .size(220.dp)
-                .clip(RoundedCornerShape(48.dp))
-                .graphicsLayer { rotationZ = 18f }
+                .offset(x = (-40).dp, y = 60.dp)
+                .size(280.dp)
+                .blur(100.dp)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            tertiary.copy(alpha = 0.18f),
+                            tertiary.copy(alpha = blob3Alpha),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+        // Subtle grid-noise overlay
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            background.copy(alpha = 0.3f),
                             Color.Transparent
                         )
                     )
@@ -165,6 +212,7 @@ fun AuroraBackground(
     }
 }
 
+// ─── Premium Glass Panel ──────────────────────────────────────────────────────
 @Composable
 fun GlassPanel(
     modifier: Modifier = Modifier,
@@ -172,56 +220,72 @@ fun GlassPanel(
     contentPadding: PaddingValues = PaddingValues(18.dp),
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Surface(
+    val surface = MaterialTheme.colorScheme.surface
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+
+    Box(
         modifier = modifier
-            .clip(MaterialTheme.shapes.medium)
+            .clip(MaterialTheme.shapes.large)
             .border(
-                BorderStroke(1.dp, accent.copy(alpha = 0.16f)),
-                MaterialTheme.shapes.medium
-            ),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-        shadowElevation = 10.dp,
-        tonalElevation = 1.dp
+                BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            accent.copy(alpha = 0.45f),
+                            accent.copy(alpha = 0.08f),
+                            surfaceVariant.copy(alpha = 0.3f)
+                        )
+                    )
+                ),
+                shape = MaterialTheme.shapes.large
+            )
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        surface.copy(alpha = 0.92f),
+                        surfaceVariant.copy(alpha = 0.88f)
+                    )
+                )
+            )
     ) {
+        // Subtle top-edge shine
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(1.dp)
                 .background(
-                    Brush.linearGradient(
+                    Brush.horizontalGradient(
                         colors = listOf(
-                            accent.copy(alpha = 0.12f),
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f)
+                            Color.Transparent,
+                            accent.copy(alpha = 0.6f),
+                            Color.Transparent
                         )
                     )
                 )
-        ) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 28.dp, y = (-34).dp)
-                    .size(132.dp, 108.dp)
-                    .clip(RoundedCornerShape(32.dp))
-                    .graphicsLayer { rotationZ = 20f }
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                accent.copy(alpha = 0.18f),
-                                Color.Transparent
-                            )
+        )
+        // Corner accent glow
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(80.dp)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            accent.copy(alpha = 0.12f),
+                            Color.Transparent
                         )
                     )
-            )
-            Column(
-                modifier = Modifier.padding(contentPadding),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                content = content
-            )
-        }
+                )
+        )
+        Column(
+            modifier = Modifier.padding(contentPadding),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            content = content
+        )
     }
 }
 
+// ─── Section Header ───────────────────────────────────────────────────────────
 @Composable
 fun SectionHeader(
     eyebrow: String,
@@ -235,29 +299,30 @@ fun SectionHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Top
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
-                text = eyebrow,
-                style = MaterialTheme.typography.labelLarge,
+                text  = eyebrow.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.ExtraBold
+                letterSpacing = 1.2.sp
             )
             Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                text       = title,
+                style      = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color      = MaterialTheme.colorScheme.onSurface
             )
             subtitle?.let {
                 Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodyMedium,
+                    text  = it,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
         if (trailing != null) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 content = trailing
             )
@@ -265,6 +330,7 @@ fun SectionHeader(
     }
 }
 
+// ─── Stat Badge ───────────────────────────────────────────────────────────────
 @Composable
 fun StatBadge(
     label: String,
@@ -272,51 +338,72 @@ fun StatBadge(
     modifier: Modifier = Modifier,
     accent: Color = MaterialTheme.colorScheme.primary
 ) {
-    Surface(
-        modifier = modifier.defaultMinSize(minWidth = 88.dp, minHeight = 76.dp),
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.16f))
+    Box(
+        modifier = modifier
+            .defaultMinSize(minWidth = 88.dp, minHeight = 72.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .border(
+                BorderStroke(1.dp, accent.copy(alpha = 0.25f)),
+                RoundedCornerShape(16.dp)
+            )
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        accent.copy(alpha = 0.10f),
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    )
+                )
+            )
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .size(8.dp)
+                        .size(6.dp)
                         .clip(CircleShape)
                         .background(accent)
                 )
                 Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium,
+                    text  = label,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium.financialFigures(FontWeight.Bold)
+                text  = value,
+                style = MaterialTheme.typography.titleSmall.financialFigures(FontWeight.Bold)
             )
         }
     }
 }
 
+// ─── Animated Glow Progress Bar ───────────────────────────────────────────────
 @Composable
 fun GlowProgressBar(
     progress: Float,
     modifier: Modifier = Modifier,
-    accent: Color = MaterialTheme.colorScheme.secondary,
-    height: Dp = 10.dp
+    accent: Color = MaterialTheme.colorScheme.primary,
+    height: Dp = 6.dp
 ) {
-    val animatedProgress = animateFloatAsState(
-        targetValue = progress.coerceIn(0f, 1f),
-        animationSpec = tween(durationMillis = 650),
+    val animatedProgress by animateFloatAsState(
+        targetValue  = progress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
         label = "glowProgress"
+    )
+
+    val infiniteTransition = rememberInfiniteTransition(label = "glowShimmer")
+    val shimmerAlpha by infiniteTransition.animateFloat(
+        initialValue  = 0.6f,
+        targetValue   = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmer"
     )
 
     Box(
@@ -324,21 +411,70 @@ fun GlowProgressBar(
             .fillMaxWidth()
             .height(height)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(animatedProgress.value)
-                .height(height)
-                .clip(CircleShape)
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            accent,
-                            MaterialTheme.colorScheme.secondary
+        if (animatedProgress > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(animatedProgress)
+                    .height(height)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                accent.copy(alpha = 0.8f),
+                                accent,
+                                accent.copy(alpha = shimmerAlpha)
+                            )
                         )
                     )
-                )
+            )
+        }
+    }
+}
+
+// ─── Neon Pill ────────────────────────────────────────────────────────────────
+@Composable
+fun NeonPill(
+    text: String,
+    accent: Color = MaterialTheme.colorScheme.primary,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .border(BorderStroke(1.dp, accent.copy(alpha = 0.4f)), CircleShape)
+            .background(accent.copy(alpha = 0.10f))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text  = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = accent,
+            fontWeight = FontWeight.SemiBold
         )
     }
+}
+
+// ─── Accent Divider ───────────────────────────────────────────────────────────
+@Composable
+fun AccentDivider(
+    accent: Color = MaterialTheme.colorScheme.primary,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        accent.copy(alpha = 0.3f),
+                        Color.Transparent
+                    )
+                )
+            )
+    )
 }

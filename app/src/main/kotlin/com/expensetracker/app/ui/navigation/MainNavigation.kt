@@ -1,9 +1,30 @@
 package com.expensetracker.app.ui.navigation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -12,19 +33,17 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -55,11 +74,11 @@ sealed class BottomNavItem(
     val icon: ImageVector,
     val label: String
 ) {
-    data object Home : BottomNavItem("home", Icons.Default.Home, "Home")
-    data object Ledger : BottomNavItem("ledger", Icons.AutoMirrored.Filled.List, "Ledger")
-    data object Calendar : BottomNavItem("calendar", Icons.Default.CalendarMonth, "Calendar")
-    data object Analytics : BottomNavItem("analytics", Icons.Default.BarChart, "Analytics")
-    data object Settings : BottomNavItem("settings", Icons.Default.Settings, "Settings")
+    data object Home      : BottomNavItem("home",      Icons.Default.Home,                    "Home")
+    data object Ledger    : BottomNavItem("ledger",    Icons.AutoMirrored.Filled.List,        "Ledger")
+    data object Calendar  : BottomNavItem("calendar",  Icons.Default.CalendarMonth,           "Calendar")
+    data object Analytics : BottomNavItem("analytics", Icons.Default.BarChart,                "Analytics")
+    data object Settings  : BottomNavItem("settings",  Icons.Default.Settings,               "Settings")
 }
 
 private val bottomNavItems = listOf(
@@ -70,7 +89,6 @@ private val bottomNavItems = listOf(
     BottomNavItem.Settings
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainNavigation(
     darkThemeEnabled: Boolean,
@@ -87,138 +105,63 @@ fun MainNavigation(
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
-                if (shouldShowBottomBar) {
-                    Surface(
-                        modifier = Modifier.padding(horizontal = ScreenEdgePadding, vertical = 10.dp),
-                        shape = MaterialTheme.shapes.large,
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                        ),
-                        shadowElevation = 10.dp
-                    ) {
-                        NavigationBar(
-                            containerColor = Color.Transparent,
-                            tonalElevation = 0.dp
-                        ) {
-                            bottomNavItems.forEach { item ->
-                                val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
-                                NavigationBarItem(
-                                    icon = {
-                                        Surface(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(18.dp))
-                                                .border(
-                                                    width = if (selected) 1.dp else 0.dp,
-                                                    color = if (selected) {
-                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-                                                    } else {
-                                                        Color.Transparent
-                                                    },
-                                                    shape = RoundedCornerShape(18.dp)
-                                                ),
-                                            shape = RoundedCornerShape(18.dp),
-                                            color = if (selected) {
-                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                            } else {
-                                                Color.Transparent
-                                            }
-                                        ) {
-                                            androidx.compose.foundation.layout.Box(
-                                                modifier = Modifier
-                                                    .background(
-                                                        if (selected) {
-                                                            Brush.verticalGradient(
-                                                                colors = listOf(
-                                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-                                                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.08f)
-                                                                )
-                                                            )
-                                                        } else {
-                                                            Brush.verticalGradient(
-                                                                colors = listOf(Color.Transparent, Color.Transparent)
-                                                            )
-                                                        }
-                                                    )
-                                                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                                            ) {
-                                                Icon(
-                                                    item.icon,
-                                                    contentDescription = item.label,
-                                                    modifier = Modifier.size(22.dp)
-                                                )
-                                            }
-                                        }
-                                    },
-                                    label = {
-                                        Text(
-                                            text = item.label,
-                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold
-                                        )
-                                    },
-                                    selected = selected,
-                                    colors = NavigationBarItemDefaults.colors(
-                                        indicatorColor = Color.Transparent,
-                                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                                        selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    onClick = {
-                                        navController.navigate(item.route) {
-                                            popUpTo(navController.graph.findStartDestination().id) {
-                                                saveState = true
-                                            }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    }
-                                )
+                AnimatedVisibility(
+                    visible = shouldShowBottomBar,
+                    enter = slideInVertically(
+                        initialOffsetY = { it },
+                        animationSpec = tween(380, easing = FastOutSlowInEasing)
+                    ) + fadeIn(tween(380)),
+                    exit = slideOutVertically(
+                        targetOffsetY = { it },
+                        animationSpec = tween(280, easing = FastOutSlowInEasing)
+                    ) + fadeOut(tween(280))
+                ) {
+                    PremiumNavBar(
+                        items = bottomNavItems,
+                        currentDestination = currentDestination,
+                        onItemClick = { item ->
+                            navController.navigate(item.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
                         }
-                    }
+                    )
                 }
             }
         ) { innerPadding ->
             NavHost(
-                navController = navController,
+                navController    = navController,
                 startDestination = Screen.Home.route,
-                modifier = Modifier.padding(innerPadding)
+                modifier         = Modifier.padding(innerPadding)
             ) {
                 composable(Screen.Home.route) {
                     HomeScreen(
-                        onAddTransaction = { navController.navigate(Screen.AddTransaction.route) },
-                        onViewLedger = { navController.navigate(Screen.LedgerDetail.route) },
-                        onOpenBudget = { navController.navigate(Screen.Budgets.route) },
-                        onOpenCaptureInbox = { navController.navigate(Screen.CaptureInbox.route) },
-                        onOpenStatementImport = { navController.navigate(Screen.Import.route) },
-                        onTransactionClick = { transactionId ->
-                            navController.navigate(Screen.EditTransaction.createRoute(transactionId))
-                        }
+                        onAddTransaction     = { navController.navigate(Screen.AddTransaction.route) },
+                        onViewLedger         = { navController.navigate(Screen.LedgerDetail.route) },
+                        onOpenBudget         = { navController.navigate(Screen.Budgets.route) },
+                        onOpenCaptureInbox   = { navController.navigate(Screen.CaptureInbox.route) },
+                        onOpenStatementImport= { navController.navigate(Screen.Import.route) },
+                        onTransactionClick   = { navController.navigate(Screen.EditTransaction.createRoute(it)) }
                     )
                 }
                 composable(Screen.Ledger.route) {
                     LedgerScreen(
-                        onTransactionClick = { transactionId ->
-                            navController.navigate(Screen.EditTransaction.createRoute(transactionId))
-                        }
+                        onTransactionClick = { navController.navigate(Screen.EditTransaction.createRoute(it)) }
                     )
                 }
                 composable(Screen.LedgerDetail.route) {
                     LedgerScreen(
-                        onTransactionClick = { transactionId ->
-                            navController.navigate(Screen.EditTransaction.createRoute(transactionId))
-                        },
-                        onNavigateBack = { navController.popBackStack() }
+                        onTransactionClick = { navController.navigate(Screen.EditTransaction.createRoute(it)) },
+                        onNavigateBack     = { navController.popBackStack() }
                     )
                 }
                 composable(Screen.Calendar.route) {
                     CalendarScreen(
-                        onDayClick = { /* Stay on current day */ },
-                        onTransactionClick = { transactionId ->
-                            navController.navigate(Screen.EditTransaction.createRoute(transactionId))
-                        }
+                        onDayClick         = { },
+                        onTransactionClick = { navController.navigate(Screen.EditTransaction.createRoute(it)) }
                     )
                 }
                 composable(Screen.Analytics.route) {
@@ -226,27 +169,21 @@ fun MainNavigation(
                 }
                 composable(Screen.Settings.route) {
                     SettingsScreen(
-                        onOpenCaptureInbox = { navController.navigate(Screen.CaptureInbox.route) },
-                        onOpenBudget = { navController.navigate(Screen.Budgets.route) },
+                        onOpenCaptureInbox    = { navController.navigate(Screen.CaptureInbox.route) },
+                        onOpenBudget          = { navController.navigate(Screen.Budgets.route) },
                         onOpenStatementImport = { navController.navigate(Screen.Import.route) },
-                        isDarkModeEnabled = darkThemeEnabled,
-                        onDarkModeChange = onDarkThemeChange
+                        isDarkModeEnabled     = darkThemeEnabled,
+                        onDarkModeChange      = onDarkThemeChange
                     )
                 }
                 composable(Screen.Budgets.route) {
-                    BudgetSetupScreen(
-                        onNavigateBack = { navController.popBackStack() }
-                    )
+                    BudgetSetupScreen(onNavigateBack = { navController.popBackStack() })
                 }
                 composable(Screen.CaptureInbox.route) {
-                    CaptureReviewScreen(
-                        onNavigateBack = { navController.popBackStack() }
-                    )
+                    CaptureReviewScreen(onNavigateBack = { navController.popBackStack() })
                 }
                 composable(Screen.Import.route) {
-                    StatementImportScreen(
-                        onNavigateBack = { navController.popBackStack() }
-                    )
+                    StatementImportScreen(onNavigateBack = { navController.popBackStack() })
                 }
                 composable(Screen.AddTransaction.route) {
                     AddEditTransactionScreen(
@@ -255,16 +192,150 @@ fun MainNavigation(
                     )
                 }
                 composable(
-                    route = Screen.EditTransaction.route,
+                    route     = Screen.EditTransaction.route,
                     arguments = listOf(navArgument("transactionId") { type = NavType.LongType })
-                ) { backStackEntry ->
-                    val transactionId = backStackEntry.arguments?.getLong("transactionId")
+                ) { backStack ->
                     AddEditTransactionScreen(
-                        transactionId = transactionId,
+                        transactionId  = backStack.arguments?.getLong("transactionId"),
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PremiumNavBar(
+    items: List<BottomNavItem>,
+    currentDestination: androidx.navigation.NavDestination?,
+    onItemClick: (BottomNavItem) -> Unit
+) {
+    val primary       = MaterialTheme.colorScheme.primary
+    val surface       = MaterialTheme.colorScheme.surface
+    val surfaceVariant= MaterialTheme.colorScheme.surfaceVariant
+    val background    = MaterialTheme.colorScheme.background
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = ScreenEdgePadding, vertical = 12.dp)
+            .navigationBarsPadding()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(28.dp))
+                .border(
+                    width = 1.dp,
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            primary.copy(alpha = 0.35f),
+                            primary.copy(alpha = 0.08f),
+                            surfaceVariant.copy(alpha = 0.4f),
+                            primary.copy(alpha = 0.15f)
+                        )
+                    ),
+                    shape = RoundedCornerShape(28.dp)
+                )
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            surface.copy(alpha = 0.95f),
+                            surfaceVariant.copy(alpha = 0.90f)
+                        )
+                    )
+                )
+                .padding(horizontal = 8.dp, vertical = 10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items.forEach { item ->
+                    val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+                    NavBarItem(
+                        item     = item,
+                        selected = selected,
+                        onClick  = { onItemClick(item) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NavBarItem(
+    item: BottomNavItem,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
+    val iconScale by animateFloatAsState(
+        targetValue   = if (selected) 1.12f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness    = Spring.StiffnessHigh
+        ),
+        label = "iconScale"
+    )
+    val dotWidth by animateDpAsState(
+        targetValue   = if (selected) 20.dp else 0.dp,
+        animationSpec = tween(300, easing = FastOutSlowInEasing),
+        label = "dotWidth"
+    )
+
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Column(
+        modifier = Modifier
+            .clickable(
+                interactionSource = interactionSource,
+                indication        = null,
+                onClick           = onClick
+            )
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(
+                    if (selected) primary.copy(alpha = 0.15f)
+                    else Color.Transparent
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector    = item.icon,
+                contentDescription = item.label,
+                tint           = if (selected) primary else onSurfaceVariant,
+                modifier       = Modifier
+                    .size(22.dp)
+                    .scale(iconScale)
+            )
+        }
+
+        Text(
+            text       = item.label,
+            style      = MaterialTheme.typography.labelSmall,
+            color      = if (selected) primary else onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+        )
+
+        // Active dot indicator
+        Box(
+            modifier = Modifier
+                .width(dotWidth)
+                .height(2.dp)
+                .clip(CircleShape)
+                .background(primary)
+        )
     }
 }

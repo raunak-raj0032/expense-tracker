@@ -760,39 +760,28 @@ private fun DaySummaryCard(
             title = date.format(DateTimeFormatter.ofPattern("EEEE, MMMM dd")),
             subtitle = "Daily pulse overview"
         )
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val summaryLayout = adaptiveFlowLayout(
-                maxWidth = maxWidth,
-                minItemWidth = 116.dp,
-                spacing = 10.dp,
-                maxColumns = 3
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            SummaryPill(
+                label = "Spent",
+                value = formatAmount(expenseTotal),
+                accent = MaterialTheme.colorScheme.error,
+                modifier = Modifier.weight(1f)
             )
-
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                maxItemsInEachRow = summaryLayout.columns
-            ) {
-                SummaryPill(
-                    label = "Spent",
-                    value = formatAmount(expenseTotal),
-                    accent = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.fillMaxWidth(summaryLayout.itemFraction)
-                )
-                SummaryPill(
-                    label = "Income",
-                    value = formatAmount(incomeTotal),
-                    accent = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.fillMaxWidth(summaryLayout.itemFraction)
-                )
-                SummaryPill(
-                    label = "Transactions",
-                    value = transactionCount.toString(),
-                    accent = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.fillMaxWidth(summaryLayout.itemFraction)
-                )
-            }
+            SummaryPill(
+                label = "Income",
+                value = formatAmount(incomeTotal),
+                accent = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.weight(1f)
+            )
+            SummaryPill(
+                label = "Transactions",
+                value = transactionCount.toString(),
+                accent = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
