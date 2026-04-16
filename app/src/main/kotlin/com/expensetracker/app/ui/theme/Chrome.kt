@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
@@ -39,8 +40,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val ScreenEdgePadding = 18.dp
-val AppButtonMinHeight = 52.dp
+val ScreenEdgePadding = 20.dp
+val AppButtonMinHeight = 56.dp
+
+val CardSpacing = 20.dp
+val SectionSpacing = 24.dp
 
 fun Modifier.appButtonSizing(): Modifier = defaultMinSize(minHeight = AppButtonMinHeight)
 
@@ -100,24 +104,26 @@ fun AuroraBackground(
         modifier = modifier
             .fillMaxSize()
             .background(
-                Brush.verticalGradient(
+                Brush.linearGradient(
                     colors = listOf(
                         background,
-                        surface,
-                        background.copy(alpha = 0.98f)
+                        background.copy(alpha = 0.98f),
+                        primary.copy(alpha = 0.04f),
+                        surface
                     )
                 )
             )
     ) {
         Box(
             modifier = Modifier
-                .offset(x = (-90).dp, y = (-70).dp)
-                .size(240.dp)
+                .offset(x = (-80).dp, y = (-84).dp)
+                .size(260.dp)
                 .clip(CircleShape)
+                .graphicsLayer { rotationZ = -16f }
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            primary.copy(alpha = 0.12f),
+                            primary.copy(alpha = 0.2f),
                             Color.Transparent
                         )
                     )
@@ -126,13 +132,14 @@ fun AuroraBackground(
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .offset(x = 60.dp, y = (-20).dp)
-                .size(200.dp)
-                .clip(CircleShape)
+                .offset(x = 56.dp, y = (-18).dp)
+                .size(184.dp, 224.dp)
+                .clip(RoundedCornerShape(42.dp))
+                .graphicsLayer { rotationZ = 12f }
                 .background(
-                    Brush.radialGradient(
+                    Brush.linearGradient(
                         colors = listOf(
-                            secondary.copy(alpha = 0.1f),
+                            secondary.copy(alpha = 0.18f),
                             Color.Transparent
                         )
                     )
@@ -141,13 +148,14 @@ fun AuroraBackground(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .offset(x = (-30).dp, y = 70.dp)
-                .size(180.dp)
-                .clip(CircleShape)
+                .offset(x = (-24).dp, y = 86.dp)
+                .size(220.dp)
+                .clip(RoundedCornerShape(48.dp))
+                .graphicsLayer { rotationZ = 18f }
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            tertiary.copy(alpha = 0.08f),
+                            tertiary.copy(alpha = 0.18f),
                             Color.Transparent
                         )
                     )
@@ -168,13 +176,13 @@ fun GlassPanel(
         modifier = modifier
             .clip(MaterialTheme.shapes.medium)
             .border(
-                BorderStroke(1.dp, accent.copy(alpha = 0.1f)),
+                BorderStroke(1.dp, accent.copy(alpha = 0.16f)),
                 MaterialTheme.shapes.medium
             ),
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-        shadowElevation = 8.dp,
-        tonalElevation = 0.dp
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+        shadowElevation = 10.dp,
+        tonalElevation = 1.dp
     ) {
         Box(
             modifier = Modifier
@@ -182,9 +190,9 @@ fun GlassPanel(
                 .background(
                     Brush.linearGradient(
                         colors = listOf(
+                            accent.copy(alpha = 0.12f),
                             MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-                            accent.copy(alpha = 0.05f),
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f)
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f)
                         )
                     )
                 )
@@ -192,13 +200,14 @@ fun GlassPanel(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(x = 32.dp, y = (-24).dp)
-                    .size(124.dp)
-                    .clip(CircleShape)
+                    .offset(x = 28.dp, y = (-34).dp)
+                    .size(132.dp, 108.dp)
+                    .clip(RoundedCornerShape(32.dp))
+                    .graphicsLayer { rotationZ = 20f }
                     .background(
-                        Brush.radialGradient(
+                        Brush.linearGradient(
                             colors = listOf(
-                                accent.copy(alpha = 0.16f),
+                                accent.copy(alpha = 0.18f),
                                 Color.Transparent
                             )
                         )
@@ -230,7 +239,8 @@ fun SectionHeader(
             Text(
                 text = eyebrow,
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.ExtraBold
             )
             Text(
                 text = title,

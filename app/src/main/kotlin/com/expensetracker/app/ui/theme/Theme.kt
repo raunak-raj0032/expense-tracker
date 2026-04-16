@@ -24,106 +24,108 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF19B58F),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFD2F5EB),
-    onPrimaryContainer = Color(0xFF002116),
-    secondary = Color(0xFF2F7D73),
+    primary = Color(0xFF2CC58D),
+    onPrimary = Color(0xFF063122),
+    primaryContainer = Color(0xFFCFF7E8),
+    onPrimaryContainer = Color(0xFF053021),
+    secondary = Color(0xFF0FA3B1),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFD0EFE9),
-    onSecondaryContainer = Color(0xFF06201C),
-    tertiary = Color(0xFFF4B860),
-    onTertiary = Color(0xFF342100),
-    tertiaryContainer = Color(0xFFFFE5BC),
-    onTertiaryContainer = Color(0xFF4A3200),
-    error = Color(0xFFE46A6A),
+    secondaryContainer = Color(0xFFD2F6F9),
+    onSecondaryContainer = Color(0xFF06363B),
+    tertiary = Color(0xFFFFC84A),
+    onTertiary = Color(0xFF4B3200),
+    tertiaryContainer = Color(0xFFFFEDB8),
+    onTertiaryContainer = Color(0xFF4A3000),
+    error = Color(0xFFE85D75),
     onError = Color.White,
-    errorContainer = Color(0xFFFFD9D8),
-    onErrorContainer = Color(0xFF4A1313),
-    background = Color(0xFFF7FBFA),
-    onBackground = Color(0xFF14201D),
+    errorContainer = Color(0xFFFFD9E0),
+    onErrorContainer = Color(0xFF561722),
+    background = Color(0xFFFFFCF4),
+    onBackground = Color(0xFF17302B),
     surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF14201D),
-    surfaceVariant = Color(0xFFDEE9E5),
-    onSurfaceVariant = Color(0xFF58706A),
-    outline = Color(0xFF93AAA4)
+    onSurface = Color(0xFF17302B),
+    surfaceVariant = Color(0xFFF1F7F2),
+    onSurfaceVariant = Color(0xFF58716A),
+    outline = Color(0xFFC7DDD1)
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF5CD6B5),
-    onPrimary = Color(0xFF03261D),
-    primaryContainer = Color(0xFF103A31),
-    onPrimaryContainer = Color(0xFFD0F7EB),
-    secondary = Color(0xFF8BD8CA),
-    onSecondary = Color(0xFF0D2520),
-    secondaryContainer = Color(0xFF1B3732),
-    onSecondaryContainer = Color(0xFFD5F3EE),
-    tertiary = Color(0xFFF2C97D),
-    onTertiary = Color(0xFF382700),
-    tertiaryContainer = Color(0xFF524015),
-    onTertiaryContainer = Color(0xFFFFE8BF),
-    error = Color(0xFFFF8C8C),
-    onError = Color(0xFF4A1313),
-    errorContainer = Color(0xFF6A2525),
-    onErrorContainer = Color(0xFFFFDAD9),
-    background = Color(0xFF101715),
-    onBackground = Color(0xFFE8F3EF),
-    surface = Color(0xFF171F1D),
-    onSurface = Color(0xFFE8F3EF),
-    surfaceVariant = Color(0xFF1F2B28),
-    onSurfaceVariant = Color(0xFFADC3BD),
-    outline = Color(0xFF455A55)
+    primary = Color(0xFF5BE0AC),
+    onPrimary = Color(0xFF05261A),
+    primaryContainer = Color(0xFF103C2C),
+    onPrimaryContainer = Color(0xFFD7FAEA),
+    secondary = Color(0xFF67D7E3),
+    onSecondary = Color(0xFF082B30),
+    secondaryContainer = Color(0xFF123D43),
+    onSecondaryContainer = Color(0xFFD2F7FA),
+    tertiary = Color(0xFFFFCF62),
+    onTertiary = Color(0xFF453000),
+    tertiaryContainer = Color(0xFF5A420B),
+    onTertiaryContainer = Color(0xFFFFEDBA),
+    error = Color(0xFFFF8FA2),
+    onError = Color(0xFF561722),
+    errorContainer = Color(0xFF6D2634),
+    onErrorContainer = Color(0xFFFFD9E0),
+    background = Color(0xFF0E1816),
+    onBackground = Color(0xFFEAF5F0),
+    surface = Color(0xFF172321),
+    onSurface = Color(0xFFEAF5F0),
+    surfaceVariant = Color(0xFF22302D),
+    onSurfaceVariant = Color(0xFFA8C3BA),
+    outline = Color(0xFF49635D)
 )
 
 private val AppTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.ExtraBold,
-        fontSize = 40.sp,
-        lineHeight = 44.sp,
-        letterSpacing = (-0.8).sp
+        fontSize = 42.sp,
+        lineHeight = 46.sp,
+        letterSpacing = (-1.1).sp
     ),
     displayMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.ExtraBold,
-        fontSize = 32.sp,
+        fontSize = 34.sp,
         lineHeight = 38.sp,
-        letterSpacing = (-0.4).sp
+        letterSpacing = (-0.8).sp
     ),
     headlineLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.ExtraBold,
         fontSize = 28.sp,
-        lineHeight = 34.sp
+        lineHeight = 34.sp,
+        letterSpacing = (-0.5).sp
     ),
     headlineMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.ExtraBold,
         fontSize = 24.sp,
-        lineHeight = 30.sp
+        lineHeight = 30.sp,
+        letterSpacing = (-0.4).sp
     ),
     titleLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
-        fontSize = 20.sp,
-        lineHeight = 26.sp,
-        letterSpacing = (-0.2).sp
+        fontSize = 21.sp,
+        lineHeight = 27.sp,
+        letterSpacing = (-0.3).sp
     ),
     titleMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = 17.sp,
         lineHeight = 24.sp
     ),
     bodyLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Medium,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 16.sp,
         lineHeight = 24.sp
     ),
     bodyMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Normal,
+        fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 20.sp
     ),
@@ -150,11 +152,11 @@ private val AppTypography = Typography(
 )
 
 private val AppShapes = Shapes(
-    extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-    small = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-    medium = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-    large = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
-    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
+    extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+    small = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+    medium = androidx.compose.foundation.shape.RoundedCornerShape(26.dp),
+    large = androidx.compose.foundation.shape.RoundedCornerShape(30.dp),
+    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(36.dp)
 )
 
 @Composable

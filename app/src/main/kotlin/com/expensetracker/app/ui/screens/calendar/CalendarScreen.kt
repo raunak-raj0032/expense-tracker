@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +62,8 @@ import com.expensetracker.app.ui.screens.home.formatAmount
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
+import com.expensetracker.app.ui.theme.CardSpacing
+import com.expensetracker.app.ui.theme.SectionSpacing
 import com.expensetracker.app.ui.theme.adaptiveFlowLayout
 import com.expensetracker.app.ui.theme.appButtonSizing
 import java.time.DayOfWeek
@@ -131,9 +132,9 @@ fun CalendarScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Calendar")
+                        Text("Rhythm")
                         Text(
-                            text = "Review spending by month, week, or a custom range",
+                            text = "See your spending cadence by month, week, or range",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -152,11 +153,11 @@ fun CalendarScreen(
                 .testTag("calendar_list"),
             contentPadding = PaddingValues(
                 start = ScreenEdgePadding,
-                top = 8.dp,
+                top = CardSpacing,
                 end = ScreenEdgePadding,
-                bottom = 110.dp
+                bottom = 120.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(SectionSpacing)
         ) {
             item {
                 PeriodNavigator(
@@ -235,7 +236,7 @@ fun CalendarScreen(
 
                 item {
                     Text(
-                        text = "Period Breakdown",
+                        text = "Range Breakdown",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -265,7 +266,7 @@ fun CalendarScreen(
 
             item {
                 Text(
-                    text = "Transactions",
+                    text = "Selected Day",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -384,43 +385,81 @@ private fun CalendarModeSelector(
         accent = MaterialTheme.colorScheme.tertiary,
         contentPadding = PaddingValues(14.dp)
     ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val modeLayout = adaptiveFlowLayout(
-                maxWidth = maxWidth,
-                minItemWidth = 116.dp,
-                spacing = 8.dp,
-                maxColumns = 3
-            )
-
-            FlowRow(
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                maxItemsInEachRow = modeLayout.columns
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 CalendarViewMode.entries.forEach { mode ->
-                    FilterChip(
+                    CompactModeChip(
+                        label = mode.name.lowercase().replaceFirstChar { it.uppercase() },
                         selected = viewMode == mode,
-                        onClick = { onViewModeChange(mode) },
-                        label = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                        modifier = Modifier.fillMaxWidth(modeLayout.itemFraction)
-                    )
-                }
-                OutlinedButton(
-                    onClick = onOpenCustomPicker,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .appButtonSizing()
-                ) {
-                    Icon(Icons.Default.DateRange, contentDescription = null)
-                    Spacer(modifier = Modifier.size(6.dp))
-                    Text(
-                        text = "Select Range",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        modifier = Modifier.weight(1f),
+                        onClick = { onViewModeChange(mode) }
                     )
                 }
             }
+
+            OutlinedButton(
+                onClick = onOpenCustomPicker,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .appButtonSizing()
+            ) {
+                Icon(Icons.Default.DateRange, contentDescription = null)
+                Spacer(modifier = Modifier.size(6.dp))
+                Text(
+                    text = "Select Range",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactModeChip(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val accent = if (selected) {
+        MaterialTheme.colorScheme.secondaryContainer
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val contentColor = if (selected) {
+        MaterialTheme.colorScheme.onSecondaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Surface(
+        modifier = modifier
+            .height(38.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(999.dp),
+        color = accent,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outline.copy(alpha = if (selected) 0.1f else 0.45f)
+        ),
+        shadowElevation = if (selected) 2.dp else 0.dp
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = contentColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

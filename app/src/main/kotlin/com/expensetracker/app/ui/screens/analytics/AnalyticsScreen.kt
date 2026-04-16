@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,7 +45,8 @@ import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.GlowProgressBar
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
-import com.expensetracker.app.ui.theme.adaptiveFlowLayout
+import com.expensetracker.app.ui.theme.CardSpacing
+import com.expensetracker.app.ui.theme.SectionSpacing
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
@@ -65,9 +65,9 @@ fun AnalyticsScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Analytics")
+                        Text("Money Story")
                         Text(
-                            text = "See where your money is going",
+                            text = "Trends, categories, and momentum at a glance",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -83,11 +83,11 @@ fun AnalyticsScreen(
             modifier = Modifier.padding(padding),
             contentPadding = PaddingValues(
                 start = ScreenEdgePadding,
-                top = 8.dp,
+                top = CardSpacing,
                 end = ScreenEdgePadding,
-                bottom = 110.dp
+                bottom = 120.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(SectionSpacing)
         ) {
             item {
                 MonthSelector(
@@ -109,7 +109,7 @@ fun AnalyticsScreen(
 
             item {
                 Text(
-                    text = "By Category",
+                    text = "Category Pulse",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -132,7 +132,7 @@ fun AnalyticsScreen(
 
             item {
                 Text(
-                    text = "Top Merchants",
+                    text = "Top Places",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -207,50 +207,82 @@ fun SummaryCard(
         )
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val summaryLayout = adaptiveFlowLayout(
-                maxWidth = maxWidth,
-                minItemWidth = 152.dp,
-                spacing = 10.dp,
-                maxColumns = 2
-            )
+            val availableWidth = maxWidth
 
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                maxItemsInEachRow = summaryLayout.columns
-            ) {
-                SummaryMetricTile(
-                    title = "Total Spent",
-                    amount = formatAmount(totalExpense),
-                    accent = MaterialTheme.colorScheme.error,
-                    icon = Icons.AutoMirrored.Filled.TrendingDown,
-                    supporting = if (previousExpense > 0L) "Compared with last month" else "Current month spend",
-                    modifier = Modifier.fillMaxWidth(summaryLayout.itemFraction),
-                    chip = {
-                        TrendChip(
-                            amount = totalExpense,
-                            previous = previousExpense,
-                            isExpense = true
-                        )
-                    }
-                )
+            if (availableWidth >= 340.dp) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    SummaryMetricTile(
+                        title = "Total Spent",
+                        amount = formatAmount(totalExpense),
+                        accent = MaterialTheme.colorScheme.error,
+                        icon = Icons.AutoMirrored.Filled.TrendingDown,
+                        supporting = if (previousExpense > 0L) "Compared with last month" else "Current month spend",
+                        modifier = Modifier.weight(1f),
+                        chip = {
+                            TrendChip(
+                                amount = totalExpense,
+                                previous = previousExpense,
+                                isExpense = true
+                            )
+                        }
+                    )
 
-                SummaryMetricTile(
-                    title = "Total Income",
-                    amount = formatAmount(totalIncome),
-                    accent = MaterialTheme.colorScheme.secondary,
-                    icon = Icons.AutoMirrored.Filled.TrendingUp,
-                    supporting = if (previousIncome > 0L) "Compared with last month" else "Current month income",
-                    modifier = Modifier.fillMaxWidth(summaryLayout.itemFraction),
-                    chip = {
-                        TrendChip(
-                            amount = totalIncome,
-                            previous = previousIncome,
-                            isExpense = false
-                        )
-                    }
-                )
+                    SummaryMetricTile(
+                        title = "Total Income",
+                        amount = formatAmount(totalIncome),
+                        accent = MaterialTheme.colorScheme.secondary,
+                        icon = Icons.AutoMirrored.Filled.TrendingUp,
+                        supporting = if (previousIncome > 0L) "Compared with last month" else "Current month income",
+                        modifier = Modifier.weight(1f),
+                        chip = {
+                            TrendChip(
+                                amount = totalIncome,
+                                previous = previousIncome,
+                                isExpense = false
+                            )
+                        }
+                    )
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    SummaryMetricTile(
+                        title = "Total Spent",
+                        amount = formatAmount(totalExpense),
+                        accent = MaterialTheme.colorScheme.error,
+                        icon = Icons.AutoMirrored.Filled.TrendingDown,
+                        supporting = if (previousExpense > 0L) "Compared with last month" else "Current month spend",
+                        modifier = Modifier.fillMaxWidth(),
+                        chip = {
+                            TrendChip(
+                                amount = totalExpense,
+                                previous = previousExpense,
+                                isExpense = true
+                            )
+                        }
+                    )
+
+                    SummaryMetricTile(
+                        title = "Total Income",
+                        amount = formatAmount(totalIncome),
+                        accent = MaterialTheme.colorScheme.secondary,
+                        icon = Icons.AutoMirrored.Filled.TrendingUp,
+                        supporting = if (previousIncome > 0L) "Compared with last month" else "Current month income",
+                        modifier = Modifier.fillMaxWidth(),
+                        chip = {
+                            TrendChip(
+                                amount = totalIncome,
+                                previous = previousIncome,
+                                isExpense = false
+                            )
+                        }
+                    )
+                }
             }
         }
 

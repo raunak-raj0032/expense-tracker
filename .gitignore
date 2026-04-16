@@ -81,3 +81,6 @@ Thumbs.db
 # Temp files
 .tmp/
 *.tmp
+
+# Local assistant config
+.claude/

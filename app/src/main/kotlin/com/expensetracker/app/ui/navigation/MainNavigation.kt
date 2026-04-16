@@ -1,8 +1,11 @@
 package com.expensetracker.app.ui.navigation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.BarChart
@@ -21,8 +24,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -85,12 +91,12 @@ fun MainNavigation(
                     Surface(
                         modifier = Modifier.padding(horizontal = ScreenEdgePadding, vertical = 10.dp),
                         shape = MaterialTheme.shapes.large,
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
                         ),
-                        shadowElevation = 6.dp
+                        shadowElevation = 10.dp
                     ) {
                         NavigationBar(
                             containerColor = Color.Transparent,
@@ -100,22 +106,57 @@ fun MainNavigation(
                                 val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
                                 NavigationBarItem(
                                     icon = {
-                                        Icon(
-                                            item.icon,
-                                            contentDescription = item.label,
+                                        Surface(
                                             modifier = Modifier
-                                                .background(
+                                                .clip(RoundedCornerShape(18.dp))
+                                                .border(
+                                                    width = if (selected) 1.dp else 0.dp,
                                                     color = if (selected) {
-                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
                                                     } else {
                                                         Color.Transparent
                                                     },
-                                                    shape = CircleShape
+                                                    shape = RoundedCornerShape(18.dp)
+                                                ),
+                                            shape = RoundedCornerShape(18.dp),
+                                            color = if (selected) {
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                            } else {
+                                                Color.Transparent
+                                            }
+                                        ) {
+                                            androidx.compose.foundation.layout.Box(
+                                                modifier = Modifier
+                                                    .background(
+                                                        if (selected) {
+                                                            Brush.verticalGradient(
+                                                                colors = listOf(
+                                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                                                                    MaterialTheme.colorScheme.tertiary.copy(alpha = 0.08f)
+                                                                )
+                                                            )
+                                                        } else {
+                                                            Brush.verticalGradient(
+                                                                colors = listOf(Color.Transparent, Color.Transparent)
+                                                            )
+                                                        }
+                                                    )
+                                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                            ) {
+                                                Icon(
+                                                    item.icon,
+                                                    contentDescription = item.label,
+                                                    modifier = Modifier.size(22.dp)
                                                 )
-                                                .padding(8.dp)
+                                            }
+                                        }
+                                    },
+                                    label = {
+                                        Text(
+                                            text = item.label,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold
                                         )
                                     },
-                                    label = { Text(item.label) },
                                     selected = selected,
                                     colors = NavigationBarItemDefaults.colors(
                                         indicatorColor = Color.Transparent,

@@ -57,7 +57,8 @@ import com.expensetracker.app.ui.screens.home.formatAmount
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
-import com.expensetracker.app.ui.theme.StatBadge
+import com.expensetracker.app.ui.theme.CardSpacing
+import com.expensetracker.app.ui.theme.SectionSpacing
 import com.expensetracker.app.ui.theme.adaptiveFlowLayout
 import com.expensetracker.app.ui.theme.appButtonSizing
 import com.expensetracker.app.ui.theme.financialFigures
@@ -86,12 +87,12 @@ fun LedgerScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Ledger")
+                        Text("History")
                         Text(
                             text = if (onNavigateBack != null) {
-                                "All transactions in one place"
+                                "A full record of every check-in"
                             } else {
-                                "Browse and edit your complete history"
+                                "Search, filter, and edit your money timeline"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -122,11 +123,11 @@ fun LedgerScreen(
                 .padding(padding),
             contentPadding = PaddingValues(
                 start = ScreenEdgePadding,
-                top = 8.dp,
+                top = CardSpacing,
                 end = ScreenEdgePadding,
-                bottom = 110.dp
+                bottom = 120.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(SectionSpacing)
         ) {
             item {
                 GlassPanel(
@@ -134,51 +135,40 @@ fun LedgerScreen(
                     accent = MaterialTheme.colorScheme.primary
                 ) {
                     SectionHeader(
-                        eyebrow = "Overview",
+                        eyebrow = "Timeline",
                         title = "${uiState.transactions.size} transactions",
                         subtitle = if (uiState.searchQuery.isBlank()) {
-                            "Search, filter, and review your recent activity."
+                            "Your complete running history in one friendly feed."
                         } else {
                             "Showing results for \"${uiState.searchQuery}\""
                         }
                     )
-                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                        val statLayout = adaptiveFlowLayout(
-                            maxWidth = maxWidth,
-                            minItemWidth = 138.dp,
-                            spacing = 10.dp,
-                            maxColumns = 2
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        LedgerOverviewCard(
+                            label = "Expense",
+                            value = formatAmount(expenseTotal),
+                            accent = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.weight(1f)
                         )
-
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            maxItemsInEachRow = statLayout.columns
-                        ) {
-                            StatBadge(
-                                label = "Expense",
-                                value = formatAmount(expenseTotal),
-                                modifier = Modifier.fillMaxWidth(statLayout.itemFraction),
-                                accent = MaterialTheme.colorScheme.error
-                            )
-                            StatBadge(
-                                label = "Income",
-                                value = formatAmount(incomeTotal),
-                                modifier = Modifier.fillMaxWidth(statLayout.itemFraction),
-                                accent = MaterialTheme.colorScheme.secondary
-                            )
-                            StatBadge(
-                                label = if (uiState.searchQuery.isBlank()) "Net" else "Filtered net",
-                                value = "${if (netTotal >= 0) "+" else "-"}${formatAmount(kotlin.math.abs(netTotal))}",
-                                modifier = Modifier.fillMaxWidth(),
-                                accent = if (netTotal >= 0) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.tertiary
-                                }
-                            )
-                        }
+                        LedgerOverviewCard(
+                            label = "Income",
+                            value = formatAmount(incomeTotal),
+                            accent = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        LedgerOverviewCard(
+                            label = if (uiState.searchQuery.isBlank()) "Net" else "Filtered",
+                            value = "${if (netTotal >= 0) "+" else "-"}${formatAmount(kotlin.math.abs(netTotal))}",
+                            accent = if (netTotal >= 0) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.tertiary
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
             }
@@ -265,6 +255,43 @@ fun LedgerScreen(
                     viewModel.resetFilters()
                     showFilterSheet = false
                 }
+            )
+        }
+    }
+}
+
+@Composable
+private fun LedgerOverviewCard(
+    label: String,
+    value: String,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            accent.copy(alpha = 0.14f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium.financialFigures(FontWeight.ExtraBold),
+                color = accent,
+                maxLines = 1
             )
         }
     }

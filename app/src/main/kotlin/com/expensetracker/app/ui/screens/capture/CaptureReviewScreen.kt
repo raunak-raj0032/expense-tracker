@@ -71,6 +71,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.foundation.text.KeyboardOptions
 import com.expensetracker.app.capture.CaptureSuggestion
+import com.expensetracker.app.capture.requestCaptureNotificationRebind
 import com.expensetracker.app.ui.screens.home.formatAmount
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
@@ -106,6 +107,9 @@ fun CaptureReviewScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 hasSmsPermission = hasSmsAccess(context)
                 notificationAccessEnabled = hasNotificationAccess(context)
+                if (notificationAccessEnabled) {
+                    requestCaptureNotificationRebind(context)
+                }
             }
         }
 
@@ -304,53 +308,36 @@ private fun CaptureAccessCard(
             subtitle = "Choose how many recent bank, UPI, and shopping messages to scan, then keep new captures flowing through notifications."
         )
 
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val tileLayout = adaptiveFlowLayout(
-                maxWidth = maxWidth,
-                minItemWidth = 140.dp,
-                spacing = 10.dp,
-                maxColumns = 2
-            )
-
-            FlowRow(
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                maxItemsInEachRow = tileLayout.columns
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 StatusTile(
                     icon = Icons.Default.MarkEmailRead,
                     label = "SMS access",
                     value = if (hasSmsPermission) "Ready" else "Required",
-                    modifier = Modifier.fillMaxWidth(tileLayout.itemFraction)
+                    modifier = Modifier.weight(1f)
                 )
                 StatusTile(
                     icon = Icons.Default.Notifications,
                     label = "Listener",
                     value = if (notificationAccessEnabled) "Enabled" else "Optional",
-                    modifier = Modifier.fillMaxWidth(tileLayout.itemFraction)
+                    modifier = Modifier.weight(1f)
                 )
             }
-        }
 
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val actionLayout = adaptiveFlowLayout(
-                maxWidth = maxWidth,
-                minItemWidth = 156.dp,
-                spacing = 8.dp,
-                maxColumns = 2
-            )
-
-            FlowRow(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                maxItemsInEachRow = actionLayout.columns
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedButton(
                     onClick = onGrantSmsAccess,
                     modifier = Modifier
-                        .fillMaxWidth(actionLayout.itemFraction)
+                        .weight(1f)
                         .appButtonSizing()
                         .testTag("capture_request_sms_button")
                 ) {
@@ -360,7 +347,7 @@ private fun CaptureAccessCard(
                     onClick = onImportRecentSms,
                     enabled = hasSmsPermission && !isImportingSms,
                     modifier = Modifier
-                        .fillMaxWidth(actionLayout.itemFraction)
+                        .weight(1f)
                         .appButtonSizing()
                         .testTag("capture_import_sms_button")
                 ) {

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -60,6 +61,8 @@ import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.GlowProgressBar
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
+import com.expensetracker.app.ui.theme.CardSpacing
+import com.expensetracker.app.ui.theme.SectionSpacing
 import com.expensetracker.app.ui.theme.adaptiveFlowLayout
 import com.expensetracker.app.ui.theme.financialFigures
 import java.time.format.DateTimeFormatter
@@ -86,9 +89,9 @@ fun HomeScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Expense Tracker")
+                        Text("Pocket Pulse")
                         Text(
-                            text = "A cleaner view of this month",
+                            text = "Friendly money tracking with a daily rhythm",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -121,11 +124,11 @@ fun HomeScreen(
                 .padding(padding),
             contentPadding = PaddingValues(
                 start = ScreenEdgePadding,
-                top = 8.dp,
+                top = CardSpacing,
                 end = ScreenEdgePadding,
-                bottom = 112.dp
+                bottom = 120.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(SectionSpacing)
         ) {
             item {
                 MonthlySummaryCard(
@@ -224,9 +227,9 @@ fun MonthlySummaryCard(
     }
     val paceValue = when {
         todayBudgetAllowance == null || budgetTotal == null -> "No budget"
-        todayExpense == 0L -> "Light"
-        todayExpense > todayBudgetAllowance -> "Fast"
-        else -> "On track"
+        todayExpense == 0L -> "Cruising"
+        todayExpense > todayBudgetAllowance -> "Too fast"
+        else -> "Steady"
     }
     val paceSupporting = when {
         todayBudgetAllowance == null || budgetTotal == null -> "Add a budget for day caps"
@@ -245,49 +248,41 @@ fun MonthlySummaryCard(
         accent = MaterialTheme.colorScheme.primary
     ) {
         SectionHeader(
-            eyebrow = "This Month",
+            eyebrow = "Money Mission",
             title = monthName,
-            subtitle = "$transactionsThisMonth entries across $activeDays active days",
+            subtitle = "$transactionsThisMonth check-ins across $activeDays active days",
             trailing = {
-                CurrencyBadge(code = "INR")
+                CurrencyBadge(
+                    code = "INR",
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                )
             }
         )
 
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val statLayout = adaptiveFlowLayout(
-                maxWidth = maxWidth,
-                minItemWidth = 148.dp,
-                spacing = 10.dp,
-                maxColumns = 2
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            InsightStatCard(
+                label = "Streak",
+                value = "${streakDays}d",
+                supporting = if (streakDays > 0) "Current money streak" else "Start your streak",
+                icon = Icons.Default.LocalFireDepartment,
+                accent = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 118.dp)
             )
-
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                maxItemsInEachRow = statLayout.columns
-            ) {
-                InsightStatCard(
-                    label = "Streak",
-                    value = "${streakDays}d",
-                    supporting = if (streakDays > 0) "Current logging run" else "Start your run",
-                    icon = Icons.Default.LocalFireDepartment,
-                    accent = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier
-                        .fillMaxWidth(statLayout.itemFraction)
-                        .heightIn(min = 118.dp)
-                )
-                InsightStatCard(
-                    label = "Coverage",
-                    value = "$coveragePercent%",
-                    supporting = "$activeDays of $dayOfMonth days",
-                    icon = Icons.Default.CalendarToday,
-                    accent = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier
-                        .fillMaxWidth(statLayout.itemFraction)
-                        .heightIn(min = 118.dp)
-                )
-            }
+            InsightStatCard(
+                label = "Coverage",
+                value = "$coveragePercent%",
+                supporting = "$activeDays of $dayOfMonth days logged",
+                icon = Icons.Default.CalendarToday,
+                accent = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 118.dp)
+            )
         }
 
         PaceHighlightCard(
@@ -350,7 +345,7 @@ private fun CurrencyBadge(
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -472,7 +467,10 @@ private fun PaceHighlightCard(
                     tint = accent
                 )
             }
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(
                     text = "Pace",
                     style = MaterialTheme.typography.labelLarge,
@@ -499,46 +497,35 @@ private fun BalanceSnapshotCard(
     totalIncome: Long,
     netFlow: Long
 ) {
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val balanceLayout = adaptiveFlowLayout(
-            maxWidth = maxWidth,
-            minItemWidth = 148.dp,
-            spacing = 10.dp,
-            maxColumns = 2
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        BalanceSnapshotItem(
+            label = "Spent",
+            amount = formatAmount(totalExpense),
+            tint = MaterialTheme.colorScheme.error,
+            icon = Icons.Default.ArrowDownward,
+            modifier = Modifier.weight(1f)
         )
-
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            maxItemsInEachRow = balanceLayout.columns
-        ) {
-            BalanceSnapshotItem(
-                label = "Spent",
-                amount = formatAmount(totalExpense),
-                tint = MaterialTheme.colorScheme.error,
-                icon = Icons.Default.ArrowDownward,
-                modifier = Modifier.fillMaxWidth(balanceLayout.itemFraction)
-            )
-            BalanceSnapshotItem(
-                label = "Received",
-                amount = formatAmount(totalIncome),
-                tint = MaterialTheme.colorScheme.primary,
-                icon = Icons.Default.ArrowUpward,
-                modifier = Modifier.fillMaxWidth(balanceLayout.itemFraction)
-            )
-            BalanceSnapshotItem(
-                label = "Net flow",
-                amount = "${if (netFlow >= 0) "+" else "-"}${formatAmount(abs(netFlow))}",
-                tint = if (netFlow >= 0) {
-                    MaterialTheme.colorScheme.secondary
-                } else {
-                    MaterialTheme.colorScheme.error
-                },
-                icon = Icons.Default.AutoAwesome,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+        BalanceSnapshotItem(
+            label = "Received",
+            amount = formatAmount(totalIncome),
+            tint = MaterialTheme.colorScheme.primary,
+            icon = Icons.Default.ArrowUpward,
+            modifier = Modifier.weight(1f)
+        )
+        BalanceSnapshotItem(
+            label = "Net Flow",
+            amount = "${if (netFlow >= 0) "+" else "-"}${formatAmount(abs(netFlow))}",
+            tint = if (netFlow >= 0) {
+                MaterialTheme.colorScheme.secondary
+            } else {
+                MaterialTheme.colorScheme.error
+            },
+            icon = Icons.Default.AutoAwesome,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
@@ -557,8 +544,8 @@ private fun BalanceSnapshotItem(
         border = androidx.compose.foundation.BorderStroke(1.dp, tint.copy(alpha = 0.14f))
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -566,7 +553,7 @@ private fun BalanceSnapshotItem(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(26.dp)
+                        .size(22.dp)
                         .background(tint.copy(alpha = 0.14f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
@@ -574,12 +561,12 @@ private fun BalanceSnapshotItem(
                         imageVector = icon,
                         contentDescription = null,
                         tint = tint,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(12.dp)
                     )
                 }
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -587,7 +574,7 @@ private fun BalanceSnapshotItem(
             }
             Text(
                 text = amount,
-                style = MaterialTheme.typography.titleLarge.financialFigures(FontWeight.ExtraBold),
+                style = MaterialTheme.typography.titleMedium.financialFigures(FontWeight.ExtraBold),
                 color = tint,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -777,30 +764,24 @@ private fun QuickActionGrid(
     ) {
         SectionHeader(
             eyebrow = "Shortcuts",
-            title = "Move faster from home",
-            subtitle = "Quick access to tracking, budgets, and smart capture."
+            title = "Your fast lane",
+            subtitle = "The everyday actions you should never have to hunt for."
         )
 
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val actionLayout = adaptiveFlowLayout(
-                maxWidth = maxWidth,
-                minItemWidth = 156.dp,
-                spacing = 10.dp,
-                maxColumns = 2
-            )
-
-            FlowRow(
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                maxItemsInEachRow = actionLayout.columns
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 HomeActionCard(
                     title = "Add transaction",
                     subtitle = "Log cash, card, or UPI activity",
                     icon = Icons.Default.Add,
                     accent = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.fillMaxWidth(actionLayout.itemFraction),
+                    modifier = Modifier.weight(1f),
                     testTag = "home_action_add",
                     onClick = onAddTransaction
                 )
@@ -810,10 +791,16 @@ private fun QuickActionGrid(
                     icon = Icons.Default.Savings,
                     accent = MaterialTheme.colorScheme.secondary,
                     badge = if (budgetName == null) "Plan" else "Active",
-                    modifier = Modifier.fillMaxWidth(actionLayout.itemFraction),
+                    modifier = Modifier.weight(1f),
                     testTag = "home_action_budget",
                     onClick = onOpenBudget
                 )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 HomeActionCard(
                     title = if (openCaptureCount > 0) "Capture Inbox" else "Smart Capture",
                     subtitle = if (openCaptureCount > 0) {
@@ -824,7 +811,7 @@ private fun QuickActionGrid(
                     icon = Icons.Default.AutoAwesome,
                     accent = MaterialTheme.colorScheme.tertiary,
                     badge = if (openCaptureCount > 0) "$openCaptureCount waiting" else "Live",
-                    modifier = Modifier.fillMaxWidth(actionLayout.itemFraction),
+                    modifier = Modifier.weight(1f),
                     testTag = "home_action_capture",
                     onClick = onOpenCaptureInbox
                 )
@@ -834,7 +821,7 @@ private fun QuickActionGrid(
                     icon = Icons.Default.Receipt,
                     accent = MaterialTheme.colorScheme.primary,
                     badge = "PDF",
-                    modifier = Modifier.fillMaxWidth(actionLayout.itemFraction),
+                    modifier = Modifier.weight(1f),
                     testTag = "home_action_statement",
                     onClick = onOpenStatementImport
                 )
@@ -856,7 +843,7 @@ private fun HomeActionCard(
 ) {
     Surface(
         modifier = modifier
-            .heightIn(min = 146.dp)
+            .height(156.dp)
             .testTag(testTag)
             .clickable(onClick = onClick),
         shape = MaterialTheme.shapes.medium,

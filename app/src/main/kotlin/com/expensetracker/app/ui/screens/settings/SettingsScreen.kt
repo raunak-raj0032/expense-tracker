@@ -56,6 +56,8 @@ import androidx.compose.ui.unit.dp
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
+import com.expensetracker.app.ui.theme.CardSpacing
+import com.expensetracker.app.ui.theme.SectionSpacing
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,9 +88,9 @@ fun SettingsScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Settings")
+                        Text("Pocket HQ")
                         Text(
-                            text = "Manage preferences, capture, and exports",
+                            text = "Appearance, capture, exports, and account controls",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -107,11 +109,11 @@ fun SettingsScreen(
                 .testTag("settings_list"),
             contentPadding = PaddingValues(
                 start = ScreenEdgePadding,
-                top = 8.dp,
+                top = CardSpacing,
                 end = ScreenEdgePadding,
-                bottom = 110.dp
+                bottom = 120.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(SectionSpacing)
         ) {
             item {
                 GlassPanel(
@@ -119,9 +121,9 @@ fun SettingsScreen(
                     accent = MaterialTheme.colorScheme.primary
                 ) {
                     SectionHeader(
-                        eyebrow = "Preferences",
-                        title = "Everything in one place",
-                        subtitle = "Adjust appearance, review capture tools, and manage the prototype from a cleaner settings hub."
+                        eyebrow = "Control Center",
+                        title = "Keep your setup tidy",
+                        subtitle = "A calmer settings hub for appearance, automation, and the money tools you use most."
                     )
                 }
             }
