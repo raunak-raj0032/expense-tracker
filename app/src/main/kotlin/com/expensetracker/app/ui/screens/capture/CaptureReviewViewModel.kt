@@ -35,11 +35,11 @@ class CaptureReviewViewModel @Inject constructor(
         }
     }
 
-    fun importRecentSms() {
+    fun importRecentSms(limit: Int? = null) {
         viewModelScope.launch {
             _uiState.update { it.copy(isImportingSms = true) }
             val message = try {
-                val imported = captureEventRepository.importRecentSms()
+                val imported = captureEventRepository.importRecentSms(limit)
                 if (imported > 0) {
                     "Imported $imported payment message(s) from your SMS history."
                 } else {

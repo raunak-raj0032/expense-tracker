@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -62,6 +63,7 @@ import com.expensetracker.app.ui.screens.home.formatAmount
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
+import com.expensetracker.app.ui.theme.adaptiveFlowLayout
 import com.expensetracker.app.ui.theme.appButtonSizing
 import java.time.DayOfWeek
 import java.time.Instant
@@ -382,33 +384,42 @@ private fun CalendarModeSelector(
         accent = MaterialTheme.colorScheme.tertiary,
         contentPadding = PaddingValues(14.dp)
     ) {
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            maxItemsInEachRow = 3
-        ) {
-            CalendarViewMode.entries.forEach { mode ->
-                FilterChip(
-                    selected = viewMode == mode,
-                    onClick = { onViewModeChange(mode) },
-                    label = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                    modifier = Modifier.fillMaxWidth(0.31f)
-                )
-            }
-            OutlinedButton(
-                onClick = onOpenCustomPicker,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .appButtonSizing()
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val modeLayout = adaptiveFlowLayout(
+                maxWidth = maxWidth,
+                minItemWidth = 116.dp,
+                spacing = 8.dp,
+                maxColumns = 3
+            )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                maxItemsInEachRow = modeLayout.columns
             ) {
-                Icon(Icons.Default.DateRange, contentDescription = null)
-                Spacer(modifier = Modifier.size(6.dp))
-                Text(
-                    text = "Select Range",
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                CalendarViewMode.entries.forEach { mode ->
+                    FilterChip(
+                        selected = viewMode == mode,
+                        onClick = { onViewModeChange(mode) },
+                        label = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                        modifier = Modifier.fillMaxWidth(modeLayout.itemFraction)
+                    )
+                }
+                OutlinedButton(
+                    onClick = onOpenCustomPicker,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .appButtonSizing()
+                ) {
+                    Icon(Icons.Default.DateRange, contentDescription = null)
+                    Spacer(modifier = Modifier.size(6.dp))
+                    Text(
+                        text = "Select Range",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
@@ -436,30 +447,39 @@ private fun PeriodOverviewCard(
             title = "${rangeStart.format(DateTimeFormatter.ofPattern("dd MMM"))} - ${rangeEnd.format(DateTimeFormatter.ofPattern("dd MMM yyyy"))}",
             subtitle = "Periodical data breakdown"
         )
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            maxItemsInEachRow = 3
-        ) {
-            SummaryPill(
-                label = "Spent",
-                value = formatAmount(expenseTotal),
-                accent = MaterialTheme.colorScheme.error,
-                modifier = Modifier.fillMaxWidth(0.31f)
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val summaryLayout = adaptiveFlowLayout(
+                maxWidth = maxWidth,
+                minItemWidth = 116.dp,
+                spacing = 10.dp,
+                maxColumns = 3
             )
-            SummaryPill(
-                label = "Income",
-                value = formatAmount(incomeTotal),
-                accent = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.fillMaxWidth(0.31f)
-            )
-            SummaryPill(
-                label = "Events",
-                value = transactionCount.toString(),
-                accent = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.fillMaxWidth(0.31f)
-            )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                maxItemsInEachRow = summaryLayout.columns
+            ) {
+                SummaryPill(
+                    label = "Spent",
+                    value = formatAmount(expenseTotal),
+                    accent = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.fillMaxWidth(summaryLayout.itemFraction)
+                )
+                SummaryPill(
+                    label = "Income",
+                    value = formatAmount(incomeTotal),
+                    accent = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.fillMaxWidth(summaryLayout.itemFraction)
+                )
+                SummaryPill(
+                    label = "Events",
+                    value = transactionCount.toString(),
+                    accent = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth(summaryLayout.itemFraction)
+                )
+            }
         }
     }
 }
@@ -701,30 +721,39 @@ private fun DaySummaryCard(
             title = date.format(DateTimeFormatter.ofPattern("EEEE, MMMM dd")),
             subtitle = "Daily pulse overview"
         )
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            maxItemsInEachRow = 3
-        ) {
-            SummaryPill(
-                label = "Spent",
-                value = formatAmount(expenseTotal),
-                accent = MaterialTheme.colorScheme.error,
-                modifier = Modifier.fillMaxWidth(0.31f)
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val summaryLayout = adaptiveFlowLayout(
+                maxWidth = maxWidth,
+                minItemWidth = 116.dp,
+                spacing = 10.dp,
+                maxColumns = 3
             )
-            SummaryPill(
-                label = "Income",
-                value = formatAmount(incomeTotal),
-                accent = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.fillMaxWidth(0.31f)
-            )
-            SummaryPill(
-                label = "Transactions",
-                value = transactionCount.toString(),
-                accent = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.fillMaxWidth(0.31f)
-            )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                maxItemsInEachRow = summaryLayout.columns
+            ) {
+                SummaryPill(
+                    label = "Spent",
+                    value = formatAmount(expenseTotal),
+                    accent = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.fillMaxWidth(summaryLayout.itemFraction)
+                )
+                SummaryPill(
+                    label = "Income",
+                    value = formatAmount(incomeTotal),
+                    accent = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.fillMaxWidth(summaryLayout.itemFraction)
+                )
+                SummaryPill(
+                    label = "Transactions",
+                    value = transactionCount.toString(),
+                    accent = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth(summaryLayout.itemFraction)
+                )
+            }
         }
     }
 }

@@ -3,6 +3,7 @@ package com.expensetracker.app.ui.screens.analytics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -45,6 +46,7 @@ import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.GlowProgressBar
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
+import com.expensetracker.app.ui.theme.adaptiveFlowLayout
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
@@ -204,41 +206,52 @@ fun SummaryCard(
             subtitle = "Spend, income, and trend signals at a glance"
         )
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            maxItemsInEachRow = 2
-        ) {
-            SummaryMetricTile(
-                title = "Total Spent",
-                amount = formatAmount(totalExpense),
-                accent = MaterialTheme.colorScheme.error,
-                icon = Icons.AutoMirrored.Filled.TrendingDown,
-                supporting = if (previousExpense > 0L) "Compared with last month" else "Current month spend",
-                chip = {
-                    TrendChip(
-                        amount = totalExpense,
-                        previous = previousExpense,
-                        isExpense = true
-                    )
-                }
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val summaryLayout = adaptiveFlowLayout(
+                maxWidth = maxWidth,
+                minItemWidth = 152.dp,
+                spacing = 10.dp,
+                maxColumns = 2
             )
 
-            SummaryMetricTile(
-                title = "Total Income",
-                amount = formatAmount(totalIncome),
-                accent = MaterialTheme.colorScheme.secondary,
-                icon = Icons.AutoMirrored.Filled.TrendingUp,
-                supporting = if (previousIncome > 0L) "Compared with last month" else "Current month income",
-                chip = {
-                    TrendChip(
-                        amount = totalIncome,
-                        previous = previousIncome,
-                        isExpense = false
-                    )
-                }
-            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                maxItemsInEachRow = summaryLayout.columns
+            ) {
+                SummaryMetricTile(
+                    title = "Total Spent",
+                    amount = formatAmount(totalExpense),
+                    accent = MaterialTheme.colorScheme.error,
+                    icon = Icons.AutoMirrored.Filled.TrendingDown,
+                    supporting = if (previousExpense > 0L) "Compared with last month" else "Current month spend",
+                    modifier = Modifier.fillMaxWidth(summaryLayout.itemFraction),
+                    chip = {
+                        TrendChip(
+                            amount = totalExpense,
+                            previous = previousExpense,
+                            isExpense = true
+                        )
+                    }
+                )
+
+                SummaryMetricTile(
+                    title = "Total Income",
+                    amount = formatAmount(totalIncome),
+                    accent = MaterialTheme.colorScheme.secondary,
+                    icon = Icons.AutoMirrored.Filled.TrendingUp,
+                    supporting = if (previousIncome > 0L) "Compared with last month" else "Current month income",
+                    modifier = Modifier.fillMaxWidth(summaryLayout.itemFraction),
+                    chip = {
+                        TrendChip(
+                            amount = totalIncome,
+                            previous = previousIncome,
+                            isExpense = false
+                        )
+                    }
+                )
+            }
         }
 
         NetFlowHeroCard(
@@ -256,10 +269,11 @@ private fun SummaryMetricTile(
     accent: Color,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     supporting: String,
+    modifier: Modifier = Modifier,
     chip: @Composable () -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(0.48f),
+        modifier = modifier,
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
         border = androidx.compose.foundation.BorderStroke(

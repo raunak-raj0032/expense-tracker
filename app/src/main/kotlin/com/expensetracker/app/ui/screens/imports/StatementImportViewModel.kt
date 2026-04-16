@@ -18,6 +18,7 @@ import javax.inject.Inject
 data class StatementImportUiState(
     val accounts: List<Account> = emptyList(),
     val selectedAccountId: Long? = null,
+    val documentPassword: String = "",
     val pastedText: String = "",
     val preview: StatementImportPreview? = null,
     val isParsing: Boolean = false,
@@ -58,18 +59,25 @@ class StatementImportViewModel @Inject constructor(
         _uiState.update { it.copy(pastedText = value) }
     }
 
+    fun updateDocumentPassword(value: String) {
+        _uiState.update { it.copy(documentPassword = value) }
+    }
+
     fun previewDocument(
         documentName: String,
         mimeType: String?,
         bytes: ByteArray
     ) {
+        val password = _uiState.value.documentPassword.takeIf { it.isNotBlank() }
+
         viewModelScope.launch {
             _uiState.update { it.copy(isParsing = true, message = null) }
             val result = runCatching {
                 statementImportRepository.previewDocument(
                     documentName = documentName,
                     mimeType = mimeType,
-                    bytes = bytes
+                    bytes = bytes,
+                    password = password
                 )
             }
 

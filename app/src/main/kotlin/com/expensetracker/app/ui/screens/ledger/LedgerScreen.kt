@@ -3,6 +3,7 @@
 package com.expensetracker.app.ui.screens.ledger
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -57,7 +58,9 @@ import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
 import com.expensetracker.app.ui.theme.StatBadge
+import com.expensetracker.app.ui.theme.adaptiveFlowLayout
 import com.expensetracker.app.ui.theme.appButtonSizing
+import com.expensetracker.app.ui.theme.financialFigures
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,6 +78,7 @@ fun LedgerScreen(
     val incomeTotal = uiState.transactions
         .filter { it.type == TransactionType.INCOME }
         .sumOf { it.amountMinor }
+    val netTotal = incomeTotal - expenseTotal
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -138,30 +142,43 @@ fun LedgerScreen(
                             "Showing results for \"${uiState.searchQuery}\""
                         }
                     )
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        maxItemsInEachRow = 3
-                    ) {
-                        StatBadge(
-                            label = "Expense",
-                            value = formatAmount(expenseTotal),
-                            modifier = Modifier.fillMaxWidth(0.31f),
-                            accent = MaterialTheme.colorScheme.error
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        val statLayout = adaptiveFlowLayout(
+                            maxWidth = maxWidth,
+                            minItemWidth = 138.dp,
+                            spacing = 10.dp,
+                            maxColumns = 2
                         )
-                        StatBadge(
-                            label = "Income",
-                            value = formatAmount(incomeTotal),
-                            modifier = Modifier.fillMaxWidth(0.31f),
-                            accent = MaterialTheme.colorScheme.secondary
-                        )
-                        StatBadge(
-                            label = "View",
-                            value = if (uiState.searchQuery.isBlank()) "All" else "Filtered",
-                            modifier = Modifier.fillMaxWidth(0.31f),
-                            accent = MaterialTheme.colorScheme.tertiary
-                        )
+
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            maxItemsInEachRow = statLayout.columns
+                        ) {
+                            StatBadge(
+                                label = "Expense",
+                                value = formatAmount(expenseTotal),
+                                modifier = Modifier.fillMaxWidth(statLayout.itemFraction),
+                                accent = MaterialTheme.colorScheme.error
+                            )
+                            StatBadge(
+                                label = "Income",
+                                value = formatAmount(incomeTotal),
+                                modifier = Modifier.fillMaxWidth(statLayout.itemFraction),
+                                accent = MaterialTheme.colorScheme.secondary
+                            )
+                            StatBadge(
+                                label = if (uiState.searchQuery.isBlank()) "Net" else "Filtered net",
+                                value = "${if (netTotal >= 0) "+" else "-"}${formatAmount(kotlin.math.abs(netTotal))}",
+                                modifier = Modifier.fillMaxWidth(),
+                                accent = if (netTotal >= 0) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.tertiary
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -184,16 +201,38 @@ fun LedgerScreen(
                 }
 
                 groupedTransactions.forEach { (date, transactions) ->
+                    val dayNet = transactions.sumOf { transaction ->
+                        if (transaction.type == TransactionType.INCOME) {
+                            transaction.amountMinor
+                        } else {
+                            -transaction.amountMinor
+                        }
+                    }
                     item {
-                        Surface(
-                            shape = MaterialTheme.shapes.small,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.11f)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.11f)
+                            ) {
+                                Text(
+                                    text = date.format(DateTimeFormatter.ofPattern("MMMM dd, yyyy")),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                )
+                            }
                             Text(
-                                text = date.format(DateTimeFormatter.ofPattern("MMMM dd, yyyy")),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                text = "${if (dayNet >= 0) "+" else "-"}${formatAmount(kotlin.math.abs(dayNet))}",
+                                style = MaterialTheme.typography.labelLarge.financialFigures(FontWeight.SemiBold),
+                                color = if (dayNet >= 0) {
+                                    MaterialTheme.colorScheme.secondary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
                             )
                         }
                     }
@@ -356,29 +395,38 @@ fun FilterSheet(
             )
         }
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            maxItemsInEachRow = 2
-        ) {
-            OutlinedButton(
-                onClick = onReset,
-                modifier = Modifier
-                    .fillMaxWidth(0.48f)
-                    .appButtonSizing()
-                    .testTag("ledger_filter_reset")
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val actionLayout = adaptiveFlowLayout(
+                maxWidth = maxWidth,
+                minItemWidth = 156.dp,
+                spacing = 8.dp,
+                maxColumns = 2
+            )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                maxItemsInEachRow = actionLayout.columns
             ) {
-                Text("Reset")
-            }
-            Button(
-                onClick = onApply,
-                modifier = Modifier
-                    .fillMaxWidth(0.48f)
-                    .appButtonSizing()
-                    .testTag("ledger_filter_apply")
-            ) {
-                Text("Apply")
+                OutlinedButton(
+                    onClick = onReset,
+                    modifier = Modifier
+                        .fillMaxWidth(actionLayout.itemFraction)
+                        .appButtonSizing()
+                        .testTag("ledger_filter_reset")
+                ) {
+                    Text("Reset")
+                }
+                Button(
+                    onClick = onApply,
+                    modifier = Modifier
+                        .fillMaxWidth(actionLayout.itemFraction)
+                        .appButtonSizing()
+                        .testTag("ledger_filter_apply")
+                ) {
+                    Text("Apply")
+                }
             }
         }
     }

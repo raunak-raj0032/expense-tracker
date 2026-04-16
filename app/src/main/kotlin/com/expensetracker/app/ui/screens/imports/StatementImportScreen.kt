@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -19,7 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -29,6 +30,8 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
@@ -60,6 +63,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.expensetracker.app.core.model.TransactionType
@@ -69,8 +75,10 @@ import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
 import com.expensetracker.app.ui.theme.StatBadge
+import com.expensetracker.app.ui.theme.adaptiveFlowLayout
 import com.expensetracker.app.ui.theme.appButtonSizing
 import java.time.format.DateTimeFormatter
+import androidx.compose.foundation.text.KeyboardOptions
 
 private data class PickedDocument(
     val name: String,
@@ -88,6 +96,7 @@ fun StatementImportScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var accountDropdownExpanded by remember { mutableStateOf(false) }
+    var passwordVisible by remember { mutableStateOf(false) }
 
     val documentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -159,30 +168,39 @@ fun StatementImportScreen(
                         subtitle = "Pick a PDF, CSV, or paste statement text, preview the parsed entries, then import only what is not already in your books."
                     )
 
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        maxItemsInEachRow = 3
-                    ) {
-                        StatBadge(
-                            label = "Supports",
-                            value = "PDF / CSV",
-                            modifier = Modifier.fillMaxWidth(0.31f),
-                            accent = MaterialTheme.colorScheme.primary
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        val badgeLayout = adaptiveFlowLayout(
+                            maxWidth = maxWidth,
+                            minItemWidth = 116.dp,
+                            spacing = 10.dp,
+                            maxColumns = 3
                         )
-                        StatBadge(
-                            label = "Paste",
-                            value = "Raw text",
-                            modifier = Modifier.fillMaxWidth(0.31f),
-                            accent = MaterialTheme.colorScheme.secondary
-                        )
-                        StatBadge(
-                            label = "Duplicates",
-                            value = "Skipped",
-                            modifier = Modifier.fillMaxWidth(0.31f),
-                            accent = MaterialTheme.colorScheme.tertiary
-                        )
+
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            maxItemsInEachRow = badgeLayout.columns
+                        ) {
+                            StatBadge(
+                                label = "Supports",
+                                value = "PDF / CSV",
+                                modifier = Modifier.fillMaxWidth(badgeLayout.itemFraction),
+                                accent = MaterialTheme.colorScheme.primary
+                            )
+                            StatBadge(
+                                label = "Paste",
+                                value = "Raw text",
+                                modifier = Modifier.fillMaxWidth(badgeLayout.itemFraction),
+                                accent = MaterialTheme.colorScheme.secondary
+                            )
+                            StatBadge(
+                                label = "Duplicates",
+                                value = "Skipped",
+                                modifier = Modifier.fillMaxWidth(badgeLayout.itemFraction),
+                                accent = MaterialTheme.colorScheme.tertiary
+                            )
+                        }
                     }
                 }
             }
@@ -228,43 +246,89 @@ fun StatementImportScreen(
                         }
                     }
 
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        maxItemsInEachRow = 2
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                documentLauncher.launch(
-                                    arrayOf(
-                                        "application/pdf",
-                                        "text/csv",
-                                        "text/plain",
-                                        "*/*"
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        val actionLayout = adaptiveFlowLayout(
+                            maxWidth = maxWidth,
+                            minItemWidth = 156.dp,
+                            spacing = 10.dp,
+                            maxColumns = 2
+                        )
+
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            maxItemsInEachRow = actionLayout.columns
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    documentLauncher.launch(
+                                        arrayOf(
+                                            "application/pdf",
+                                            "text/csv",
+                                            "text/plain",
+                                            "*/*"
+                                        )
                                     )
-                                )
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth(0.48f)
-                                .appButtonSizing()
-                        ) {
-                            Icon(Icons.Default.FileOpen, contentDescription = null)
-                            Spacer(modifier = Modifier.size(8.dp))
-                            Text(if (uiState.isParsing) "Reading..." else "Choose File")
-                        }
-                        Button(
-                            onClick = viewModel::previewPastedText,
-                            enabled = !uiState.isParsing,
-                            modifier = Modifier
-                                .fillMaxWidth(0.48f)
-                                .appButtonSizing()
-                        ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null)
-                            Spacer(modifier = Modifier.size(8.dp))
-                            Text("Parse Pasted")
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth(actionLayout.itemFraction)
+                                    .appButtonSizing()
+                            ) {
+                                Icon(Icons.Default.FileOpen, contentDescription = null)
+                                Spacer(modifier = Modifier.size(8.dp))
+                                Text(if (uiState.isParsing) "Reading..." else "Choose File")
+                            }
+                            Button(
+                                onClick = viewModel::previewPastedText,
+                                enabled = !uiState.isParsing,
+                                modifier = Modifier
+                                    .fillMaxWidth(actionLayout.itemFraction)
+                                    .appButtonSizing()
+                            ) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                                Spacer(modifier = Modifier.size(8.dp))
+                                Text("Parse Pasted")
+                            }
                         }
                     }
+
+                    OutlinedTextField(
+                        value = uiState.documentPassword,
+                        onValueChange = viewModel::updateDocumentPassword,
+                        label = { Text("PDF password (optional)") },
+                        placeholder = { Text("Enter only for encrypted PDFs") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = !uiState.isParsing,
+                        visualTransformation = if (passwordVisible) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) {
+                                        Icons.Default.VisibilityOff
+                                    } else {
+                                        Icons.Default.Visibility
+                                    },
+                                    contentDescription = if (passwordVisible) {
+                                        "Hide password"
+                                    } else {
+                                        "Show password"
+                                    }
+                                )
+                            }
+                        }
+                    )
+                    Text(
+                        text = "Used only when opening encrypted PDF statements.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
                     OutlinedTextField(
                         value = uiState.pastedText,
@@ -365,30 +429,39 @@ fun StatementImportScreen(
                             subtitle = "${preview.entries.size} parsed entries, ${preview.duplicateCount} duplicates, ${preview.ignoredLineCount} ignored lines"
                         )
 
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            maxItemsInEachRow = 3
-                        ) {
-                            StatBadge(
-                                label = "Expense",
-                                value = formatAmount(preview.expenseTotal),
-                                modifier = Modifier.fillMaxWidth(0.31f),
-                                accent = MaterialTheme.colorScheme.error
+                        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                            val badgeLayout = adaptiveFlowLayout(
+                                maxWidth = maxWidth,
+                                minItemWidth = 116.dp,
+                                spacing = 10.dp,
+                                maxColumns = 3
                             )
-                            StatBadge(
-                                label = "Income",
-                                value = formatAmount(preview.incomeTotal),
-                                modifier = Modifier.fillMaxWidth(0.31f),
-                                accent = MaterialTheme.colorScheme.secondary
-                            )
-                            StatBadge(
-                                label = "Importable",
-                                value = (preview.entries.size - preview.duplicateCount).coerceAtLeast(0).toString(),
-                                modifier = Modifier.fillMaxWidth(0.31f),
-                                accent = MaterialTheme.colorScheme.primary
-                            )
+
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                maxItemsInEachRow = badgeLayout.columns
+                            ) {
+                                StatBadge(
+                                    label = "Expense",
+                                    value = formatAmount(preview.expenseTotal),
+                                    modifier = Modifier.fillMaxWidth(badgeLayout.itemFraction),
+                                    accent = MaterialTheme.colorScheme.error
+                                )
+                                StatBadge(
+                                    label = "Income",
+                                    value = formatAmount(preview.incomeTotal),
+                                    modifier = Modifier.fillMaxWidth(badgeLayout.itemFraction),
+                                    accent = MaterialTheme.colorScheme.secondary
+                                )
+                                StatBadge(
+                                    label = "Importable",
+                                    value = (preview.entries.size - preview.duplicateCount).coerceAtLeast(0).toString(),
+                                    modifier = Modifier.fillMaxWidth(badgeLayout.itemFraction),
+                                    accent = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
 
                         Button(
@@ -405,7 +478,10 @@ fun StatementImportScreen(
                     }
                 }
 
-                items(preview.entries.take(24), key = { it.fingerprint }) { entry ->
+                itemsIndexed(
+                    items = preview.entries.take(24),
+                    key = { index, entry -> "${entry.fingerprint}:$index" }
+                ) { _, entry ->
                     StatementPreviewCard(entry = entry)
                 }
             }

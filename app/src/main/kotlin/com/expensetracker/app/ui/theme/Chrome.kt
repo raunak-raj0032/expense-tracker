@@ -32,14 +32,58 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 val ScreenEdgePadding = 18.dp
 val AppButtonMinHeight = 52.dp
 
 fun Modifier.appButtonSizing(): Modifier = defaultMinSize(minHeight = AppButtonMinHeight)
+
+data class AdaptiveFlowLayout(
+    val columns: Int,
+    val itemFraction: Float
+)
+
+fun TextStyle.financialFigures(
+    weight: FontWeight? = null,
+    letterSpacing: TextUnit = (-0.3).sp
+): TextStyle = copy(
+    fontWeight = weight ?: this.fontWeight,
+    letterSpacing = letterSpacing,
+    fontFeatureSettings = "tnum"
+)
+
+fun adaptiveFlowLayout(
+    maxWidth: Dp,
+    minItemWidth: Dp,
+    spacing: Dp,
+    maxColumns: Int
+): AdaptiveFlowLayout {
+    if (maxWidth <= 0.dp) {
+        return AdaptiveFlowLayout(columns = 1, itemFraction = 1f)
+    }
+
+    val resolvedMaxColumns = maxColumns.coerceAtLeast(1)
+    var columns = resolvedMaxColumns
+    while (columns > 1) {
+        val candidateWidth = (maxWidth - spacing * (columns - 1)) / columns
+        if (candidateWidth >= minItemWidth) {
+            break
+        }
+        columns -= 1
+    }
+
+    val itemWidth = (maxWidth - spacing * (columns - 1)) / columns
+    return AdaptiveFlowLayout(
+        columns = columns,
+        itemFraction = (itemWidth / maxWidth).coerceIn(0f, 1f)
+    )
+}
 
 @Composable
 fun AuroraBackground(
@@ -246,8 +290,7 @@ fun StatBadge(
             }
             Text(
                 text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.titleMedium.financialFigures(FontWeight.Bold)
             )
         }
     }

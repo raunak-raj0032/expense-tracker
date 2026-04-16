@@ -11,6 +11,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -32,17 +33,21 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -58,16 +63,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.foundation.text.KeyboardOptions
 import com.expensetracker.app.capture.CaptureSuggestion
 import com.expensetracker.app.ui.screens.home.formatAmount
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
+import com.expensetracker.app.ui.theme.adaptiveFlowLayout
 import com.expensetracker.app.ui.theme.appButtonSizing
 import java.time.format.DateTimeFormatter
 
@@ -83,6 +91,9 @@ fun CaptureReviewScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var hasSmsPermission by remember { mutableStateOf(hasSmsAccess(context)) }
     var notificationAccessEnabled by remember { mutableStateOf(hasNotificationAccess(context)) }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var importLimitInput by remember { mutableStateOf("50") }
+    var importLimitError by remember { mutableStateOf<String?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -163,7 +174,10 @@ fun CaptureReviewScreen(
                             )
                         )
                     },
-                    onImportRecentSms = viewModel::importRecentSms,
+                    onImportRecentSms = {
+                        importLimitError = null
+                        showImportDialog = true
+                    },
                     onOpenNotificationSettings = {
                         context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                     }
@@ -186,6 +200,89 @@ fun CaptureReviewScreen(
             }
         }
     }
+
+    if (showImportDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!uiState.isImportingSms) {
+                    showImportDialog = false
+                    importLimitError = null
+                }
+            },
+            title = { Text("Import recent SMS") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "How many of your latest messages should Smart Capture scan for transactions?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("25", "50", "100").forEach { option ->
+                            FilterChip(
+                                selected = importLimitInput == option,
+                                onClick = {
+                                    importLimitInput = option
+                                    importLimitError = null
+                                },
+                                label = { Text("$option latest") }
+                            )
+                        }
+                    }
+                    OutlinedTextField(
+                        value = importLimitInput,
+                        onValueChange = { input ->
+                            if (input.isEmpty() || input.all(Char::isDigit)) {
+                                importLimitInput = input
+                                importLimitError = null
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("capture_import_sms_limit_input"),
+                        label = { Text("Messages to scan") },
+                        placeholder = { Text("50") },
+                        singleLine = true,
+                        isError = importLimitError != null,
+                        supportingText = {
+                            Text(importLimitError ?: "Start with the latest alerts to keep imports fast and relevant.")
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val limit = importLimitInput.toIntOrNull()
+                        if (limit == null || limit <= 0) {
+                            importLimitError = "Enter a number greater than 0."
+                            return@TextButton
+                        }
+                        showImportDialog = false
+                        viewModel.importRecentSms(limit)
+                    },
+                    enabled = !uiState.isImportingSms
+                ) {
+                    Text(if (uiState.isImportingSms) "Importing..." else "Import")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showImportDialog = false
+                        importLimitError = null
+                    },
+                    enabled = !uiState.isImportingSms
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -204,53 +301,71 @@ private fun CaptureAccessCard(
         SectionHeader(
             eyebrow = "Capture",
             title = if (hasSmsPermission) "SMS import is ready" else "Allow SMS access to get started",
-            subtitle = "Import bank, UPI, and shopping messages from SMS, then keep new captures flowing through notifications."
+            subtitle = "Choose how many recent bank, UPI, and shopping messages to scan, then keep new captures flowing through notifications."
         )
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            maxItemsInEachRow = 2
-        ) {
-            StatusTile(
-                icon = Icons.Default.MarkEmailRead,
-                label = "SMS access",
-                value = if (hasSmsPermission) "Ready" else "Required",
-                modifier = Modifier.fillMaxWidth(0.48f)
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val tileLayout = adaptiveFlowLayout(
+                maxWidth = maxWidth,
+                minItemWidth = 140.dp,
+                spacing = 10.dp,
+                maxColumns = 2
             )
-            StatusTile(
-                icon = Icons.Default.Notifications,
-                label = "Listener",
-                value = if (notificationAccessEnabled) "Enabled" else "Optional",
-                modifier = Modifier.fillMaxWidth(0.48f)
-            )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                maxItemsInEachRow = tileLayout.columns
+            ) {
+                StatusTile(
+                    icon = Icons.Default.MarkEmailRead,
+                    label = "SMS access",
+                    value = if (hasSmsPermission) "Ready" else "Required",
+                    modifier = Modifier.fillMaxWidth(tileLayout.itemFraction)
+                )
+                StatusTile(
+                    icon = Icons.Default.Notifications,
+                    label = "Listener",
+                    value = if (notificationAccessEnabled) "Enabled" else "Optional",
+                    modifier = Modifier.fillMaxWidth(tileLayout.itemFraction)
+                )
+            }
         }
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            maxItemsInEachRow = 2
-        ) {
-            OutlinedButton(
-                onClick = onGrantSmsAccess,
-                modifier = Modifier
-                    .fillMaxWidth(0.48f)
-                    .appButtonSizing()
-                    .testTag("capture_request_sms_button")
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val actionLayout = adaptiveFlowLayout(
+                maxWidth = maxWidth,
+                minItemWidth = 156.dp,
+                spacing = 8.dp,
+                maxColumns = 2
+            )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                maxItemsInEachRow = actionLayout.columns
             ) {
-                Text(if (hasSmsPermission) "Refresh Access" else "Grant Access")
-            }
-            Button(
-                onClick = onImportRecentSms,
-                enabled = hasSmsPermission && !isImportingSms,
-                modifier = Modifier
-                    .fillMaxWidth(0.48f)
-                    .appButtonSizing()
-                    .testTag("capture_import_sms_button")
-            ) {
-                Text(if (isImportingSms) "Importing..." else "Import SMS History")
+                OutlinedButton(
+                    onClick = onGrantSmsAccess,
+                    modifier = Modifier
+                        .fillMaxWidth(actionLayout.itemFraction)
+                        .appButtonSizing()
+                        .testTag("capture_request_sms_button")
+                ) {
+                    Text(if (hasSmsPermission) "Refresh Access" else "Grant Access")
+                }
+                Button(
+                    onClick = onImportRecentSms,
+                    enabled = hasSmsPermission && !isImportingSms,
+                    modifier = Modifier
+                        .fillMaxWidth(actionLayout.itemFraction)
+                        .appButtonSizing()
+                        .testTag("capture_import_sms_button")
+                ) {
+                    Text(if (isImportingSms) "Importing..." else "Scan Recent SMS")
+                }
             }
         }
 
@@ -384,29 +499,38 @@ private fun CaptureSuggestionCard(
             }
         }
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            maxItemsInEachRow = 2
-        ) {
-            Button(
-                onClick = onAddToLedger,
-                enabled = !isBusy,
-                modifier = Modifier
-                    .fillMaxWidth(0.48f)
-                    .appButtonSizing()
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val actionLayout = adaptiveFlowLayout(
+                maxWidth = maxWidth,
+                minItemWidth = 152.dp,
+                spacing = 8.dp,
+                maxColumns = 2
+            )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                maxItemsInEachRow = actionLayout.columns
             ) {
-                Text(if (isBusy) "Working..." else "Add to Ledger")
-            }
-            OutlinedButton(
-                onClick = onIgnore,
-                enabled = !isBusy,
-                modifier = Modifier
-                    .fillMaxWidth(0.48f)
-                    .appButtonSizing()
-            ) {
-                Text("Ignore")
+                Button(
+                    onClick = onAddToLedger,
+                    enabled = !isBusy,
+                    modifier = Modifier
+                        .fillMaxWidth(actionLayout.itemFraction)
+                        .appButtonSizing()
+                ) {
+                    Text(if (isBusy) "Working..." else "Add to Ledger")
+                }
+                OutlinedButton(
+                    onClick = onIgnore,
+                    enabled = !isBusy,
+                    modifier = Modifier
+                        .fillMaxWidth(actionLayout.itemFraction)
+                        .appButtonSizing()
+                ) {
+                    Text("Ignore")
+                }
             }
         }
     }

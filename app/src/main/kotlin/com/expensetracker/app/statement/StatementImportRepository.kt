@@ -54,13 +54,15 @@ class StatementImportRepository @Inject constructor(
     suspend fun previewDocument(
         documentName: String,
         mimeType: String?,
-        bytes: ByteArray
+        bytes: ByteArray,
+        password: String? = null
     ): StatementImportPreview = withContext(Dispatchers.Default) {
         toPreview(
             parser.parseDocument(
                 documentName = documentName,
                 mimeType = mimeType,
-                bytes = bytes
+                bytes = bytes,
+                password = password
             )
         )
     }

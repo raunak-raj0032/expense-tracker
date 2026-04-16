@@ -3,6 +3,7 @@ package com.expensetracker.app.statement
 import com.expensetracker.app.capture.PaymentMessageParser
 import com.expensetracker.app.core.model.TransactionType
 import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import java.math.RoundingMode
 import java.time.LocalDate
@@ -39,6 +40,17 @@ data class ParsedStatementSource(
     val ignoredLineCount: Int
 )
 
+private data class MonetaryCandidate(
+    val raw: String,
+    val amountMinor: Long
+)
+
+private data class TrailingAmountMatch(
+    val description: String,
+    val amountMinor: Long,
+    val direction: TransactionType?
+)
+
 @Singleton
 class StatementImportParser @Inject constructor(
     private val paymentMessageParser: PaymentMessageParser
@@ -47,20 +59,17 @@ class StatementImportParser @Inject constructor(
     fun parseDocument(
         documentName: String,
         mimeType: String?,
-        bytes: ByteArray
+        bytes: ByteArray,
+        password: String? = null
     ): ParsedStatementSource {
         val isPdf = mimeType == "application/pdf" || documentName.lowercase(Locale.ROOT).endsWith(".pdf")
         
         val text = when {
-            isPdf -> {
-                extractPdfText(bytes).getOrElse { ex ->
-                    throw StatementParseException(
-                        message = "Unable to read PDF file. The document may be password-protected, corrupted, or an image-based (scanned) PDF that cannot be parsed. " +
-                            "Try converting it to text or CSV format, or copy-paste the statement text instead.",
-                        cause = ex
-                    )
-                }
-            }
+            isPdf -> extractPdfText(
+                documentName = documentName,
+                bytes = bytes,
+                password = password
+            )
             else -> String(bytes, Charsets.UTF_8)
         }
         
@@ -86,7 +95,7 @@ class StatementImportParser @Inject constructor(
         rawText: String,
         preferDelimited: Boolean = false
     ): ParsedStatementSource {
-        val trimmed = rawText.trim()
+        val trimmed = isolateStatementBody(rawText.trim())
         if (trimmed.isBlank()) {
             return ParsedStatementSource(sourceName = sourceName, entries = emptyList(), ignoredLineCount = 0)
         }
@@ -115,18 +124,47 @@ class StatementImportParser @Inject constructor(
         )
     }
 
-    private fun extractPdfText(bytes: ByteArray): Result<String> {
-        return runCatching {
-            PDDocument.load(bytes).use { document ->
-                if (document.isEncrypted) {
-                    throw StatementParseException("The PDF is password-protected. Please remove the password and try again.")
-                }
-                val text = PDFTextStripper().getText(document)
+    private fun extractPdfText(
+        documentName: String,
+        bytes: ByteArray,
+        password: String?
+    ): String {
+        val normalizedPassword = password?.takeIf { it.isNotBlank() }
+
+        try {
+            val document = if (normalizedPassword == null) {
+                PDDocument.load(bytes)
+            } else {
+                PDDocument.load(bytes, normalizedPassword)
+            }
+
+            return document.use { document ->
+                val text = PDFTextStripper().apply {
+                    setSortByPosition(true)
+                    setShouldSeparateByBeads(false)
+                }.getText(document)
                 if (text.isBlank()) {
                     throw StatementParseException("PDF contains no extractable text. It may be a scanned/image-based PDF.")
                 }
                 text
             }
+        } catch (error: InvalidPasswordException) {
+            throw StatementParseException(
+                message = if (normalizedPassword == null) {
+                    "The PDF file '$documentName' is password-protected. Enter the PDF password and try again."
+                } else {
+                    "The password for '$documentName' is incorrect. Check it and try again."
+                },
+                cause = error
+            )
+        } catch (error: StatementParseException) {
+            throw error
+        } catch (error: Exception) {
+            throw StatementParseException(
+                message = "Unable to read PDF file. The document may be corrupted or use an unsupported format. " +
+                    "If it is scanned, export it to text/CSV or paste the statement text instead.",
+                cause = error
+            )
         }
     }
 
@@ -283,11 +321,17 @@ class StatementImportParser @Inject constructor(
 
         var ignoredLineCount = 0
         val entries = mutableListOf<StatementImportDraft>()
+        var lastDate: LocalDate? = null
 
         for (line in lines) {
-            val draft = parseFreeformLine(sourceName, line)
+            val draft = parseFreeformLine(
+                sourceName = sourceName,
+                line = line,
+                fallbackDate = lastDate
+            )
             if (draft != null) {
                 entries.add(draft)
+                lastDate = draft.transactionTime.toLocalDate()
             } else {
                 ignoredLineCount++
             }
@@ -300,63 +344,86 @@ class StatementImportParser @Inject constructor(
         )
     }
 
-    private fun parseFreeformLine(sourceName: String, line: String): StatementImportDraft? {
-        val dateMatch = findDateInLine(line) ?: return null
-        val date = dateMatch.second ?: return null
-        
-        val beforeDate = line.substring(0, dateMatch.first.first)
-        val afterDate = line.substring(dateMatch.first.last + 1)
-        
-        val segments = (beforeDate + " " + afterDate)
+    private fun parseFreeformLine(
+        sourceName: String,
+        line: String,
+        fallbackDate: LocalDate? = null
+    ): StatementImportDraft? {
+        val dateMatch = findDateInLine(line)
+        val date = dateMatch?.second ?: fallbackDate ?: return null
+
+        val rawContent = if (dateMatch != null) {
+            stripAllDates(line)
+        } else {
+            line
+        }
+        val normalizedContent = rawContent.normalizeWhitespace()
+        val segments = rawContent
             .split(Regex("[\\s]{2,}"))
             .map { it.trim() }
             .filter { it.isNotBlank() }
 
         if (segments.isEmpty()) return null
 
+        extractTrailingAmountMatch(normalizedContent)?.let { match ->
+            if (match.direction != null) {
+                return buildDraft(
+                    sourceName = sourceName,
+                    date = date,
+                    description = match.description,
+                    amountMinor = match.amountMinor,
+                    direction = match.direction,
+                    rawLine = line
+                )
+            }
+        }
+
+        if (dateMatch == null) {
+            return null
+        }
+
         var amountMinor: Long? = null
         var direction: TransactionType = TransactionType.EXPENSE
         var amountIndex = -1
         
         for ((i, seg) in segments.withIndex()) {
-            val parsed = parseAmountMinor(seg)
-            if (parsed != null) {
-                amountMinor = parsed
+            val candidate = selectTransactionAmountCandidate(findMonetaryCandidates(seg))
+            if (candidate != null) {
+                amountMinor = candidate.amountMinor
                 amountIndex = i
                 
-                val hasCr = seg.contains("cr", ignoreCase = true)
-                val hasDr = seg.contains("dr", ignoreCase = true)
+                val hasCr = candidate.raw.contains("cr", ignoreCase = true)
+                val hasDr = candidate.raw.contains("dr", ignoreCase = true)
                 val isNegative = seg.startsWith("-") || seg.startsWith("(") || seg.startsWith("−")
                 
                 direction = when {
                     hasCr -> TransactionType.INCOME
                     hasDr -> TransactionType.EXPENSE
                     isNegative -> TransactionType.INCOME
-                    else -> TransactionType.EXPENSE
+                    else -> inferDirectionFromDescription(normalizedContent)
                 }
                 break
             }
         }
 
         if (amountMinor == null) {
-            val amountsInLine = amountRegex.findAll(line).toList()
-            if (amountsInLine.isNotEmpty()) {
-                val lastAmount = amountsInLine.last()
-                val amtStr = lastAmount.value
-                amountMinor = parseAmountMinor(amtStr)
-                if (amountMinor != null) {
-                    val hasCr = amtStr.contains("cr", ignoreCase = true)
-                    val hasDr = amtStr.contains("dr", ignoreCase = true)
-                    direction = when {
-                        hasCr -> TransactionType.INCOME
-                        hasDr -> TransactionType.EXPENSE
-                        else -> TransactionType.EXPENSE
-                    }
+            val candidate = selectTransactionAmountCandidate(findMonetaryCandidates(rawContent))
+            if (candidate != null) {
+                amountMinor = candidate.amountMinor
+                val hasCr = candidate.raw.contains("cr", ignoreCase = true)
+                val hasDr = candidate.raw.contains("dr", ignoreCase = true)
+                direction = when {
+                    hasCr -> TransactionType.INCOME
+                    hasDr -> TransactionType.EXPENSE
+                    else -> inferDirectionFromDescription(normalizedContent)
                 }
             }
         }
 
         if (amountMinor == null) return null
+        if (!looksLikeTransactionLine(normalizedContent) && amountMinor > 10_000_000L) {
+            return null
+        }
 
         val description = segments.filterIndexed { i, _ -> i != amountIndex }
             .joinToString(" ")
@@ -372,6 +439,140 @@ class StatementImportParser @Inject constructor(
             direction = direction,
             rawLine = line
         )
+    }
+
+    private fun extractTrailingAmountMatch(content: String): TrailingAmountMatch? {
+        val lastAmount = amountRegex.findAll(content).lastOrNull() ?: return null
+        val description = content.substring(0, lastAmount.range.first).normalizeWhitespace()
+        val amountText = lastAmount.value
+        val marker = content.substring(lastAmount.range.last + 1).trim()
+        val amountMinor = parseAmountMinor(amountText) ?: return null
+
+        return TrailingAmountMatch(
+            description = description.ifBlank { content.normalizeWhitespace() },
+            amountMinor = amountMinor,
+            direction = directionForMarker(marker)
+        )
+    }
+
+    private fun directionForMarker(marker: String): TransactionType? {
+        return when (marker.uppercase(Locale.ROOT)) {
+            "C", "CR" -> TransactionType.INCOME
+            "D", "DR", "DB", "M" -> TransactionType.EXPENSE
+            else -> null
+        }
+    }
+
+    private fun inferDirectionFromDescription(description: String): TransactionType {
+        val lower = description.lowercase(Locale.ROOT)
+        return when {
+            lower.contains("/cr/") ||
+                lower.contains(" dep tfr") ||
+                lower.startsWith("dep tfr") ||
+                lower.contains("interest credit") ||
+                lower.contains("salary credit") ||
+            lower.contains("payment received") ||
+                lower.contains("waiver") ||
+                lower.contains("reversal") ||
+                lower.contains("refund") ||
+                lower.contains("cashback") ||
+                lower.contains(" credit") -> TransactionType.INCOME
+            lower.contains("/dr/") ||
+                lower.contains(" wdl tfr") ||
+                lower.startsWith("wdl tfr") ||
+                lower.contains(" debit") ||
+                lower.contains("withdraw") -> TransactionType.EXPENSE
+            else -> TransactionType.EXPENSE
+        }
+    }
+
+    private fun findMonetaryCandidates(text: String): List<MonetaryCandidate> {
+        return amountRegex.findAll(text)
+            .mapNotNull { match ->
+                val raw = match.value.trim()
+                if (!looksLikeMonetaryToken(raw, text)) {
+                    return@mapNotNull null
+                }
+
+                parseAmountMinor(raw)?.let { amountMinor ->
+                    MonetaryCandidate(raw = raw, amountMinor = amountMinor)
+                }
+            }
+            .toList()
+    }
+
+    private fun selectTransactionAmountCandidate(candidates: List<MonetaryCandidate>): MonetaryCandidate? {
+        if (candidates.isEmpty()) {
+            return null
+        }
+        if (candidates.size == 1) {
+            return candidates.first()
+        }
+
+        return candidates
+            .dropLast(1)
+            .minByOrNull { it.amountMinor }
+            ?: candidates.first()
+    }
+
+    private fun looksLikeMonetaryToken(value: String, context: String): Boolean {
+        val cleaned = value.trim()
+        if (cleaned.isBlank() || cleaned == "-") {
+            return false
+        }
+
+        val normalized = cleaned.lowercase(Locale.ROOT)
+        val digits = normalized.filter { it.isDigit() }
+        val hasDecimal = normalized.contains('.')
+        val hasGrouping = normalized.contains(',')
+        val hasCurrency = normalized.contains("\u20b9") || normalized.contains("â‚¹") || normalized.contains("inr") || normalized.contains("rs")
+        val hasDirection = normalized.contains("cr") || normalized.contains("dr")
+        val plainIntegerInText = !hasDecimal && !hasGrouping && !hasCurrency && !hasDirection
+
+        if (plainIntegerInText && context.any { it.isLetter() }) {
+            return false
+        }
+
+        return when {
+            digits.isEmpty() -> false
+            hasDecimal || hasGrouping || hasCurrency || hasDirection -> true
+            digits.length <= 6 -> true
+            else -> false
+        }
+    }
+
+    private fun looksLikeTransactionLine(content: String): Boolean {
+        val lower = content.lowercase(Locale.ROOT)
+        return lower.contains("upi/") ||
+            lower.contains("imps/") ||
+            lower.contains("wdl tfr") ||
+            lower.contains("dep tfr") ||
+            lower.contains("interest credit") ||
+            lower.contains("neft/") ||
+            lower.contains("rtgs/") ||
+            lower.contains("transfer")
+    }
+
+    private fun stripAllDates(line: String): String {
+        var stripped = line
+        for (pattern in datePatterns) {
+            stripped = pattern.toRegex().replace(stripped, " ")
+        }
+        return stripped
+    }
+
+    private fun isolateStatementBody(text: String): String {
+        val lines = text.lines()
+        val startIndex = lines.indexOfFirst { it.contains("Statement From", ignoreCase = true) }
+        val endIndex = lines.indexOfFirst { it.contains("Statement Summary", ignoreCase = true) }
+
+        if (startIndex == -1 || endIndex == -1 || endIndex <= startIndex) {
+            return text
+        }
+
+        return lines.subList(startIndex + 1, endIndex)
+            .joinToString("\n")
+            .trim()
     }
 
     private fun findDateInLine(line: String): Pair<IntRange, LocalDate?>? {
@@ -462,6 +663,7 @@ class StatementImportParser @Inject constructor(
 
         val cleaned = value
             .replace(",", "")
+            .replace("\u20B9", "", ignoreCase = false)
             .replace("₹", "", ignoreCase = false)
             .replace("INR", "", ignoreCase = true)
             .replace("Rs.", "", ignoreCase = true)
@@ -548,6 +750,10 @@ class StatementImportParser @Inject constructor(
     private companion object {
         val amountRegex = Regex(
             "(?i)[(\\[\\-]?\\s*(?:₹|rs\\.?|inr)?\\s*[0-9][0-9,]*(?:\\.\\d{1,2})?\\s*(?:cr|dr)?\\s*[)\\]]?"
+        )
+
+        val trailingAmountRegex = Regex(
+            "(?is)^(.*)([(\\[\\-]?\\s*(?:₹|â‚¹|rs\\.?|inr)?\\s*[0-9][0-9,]*(?:\\.\\d{1,2})?\\s*[)\\]]?)(?:\\s+([A-Z]{1,2}))?$"
         )
 
         val datePatterns = listOf(

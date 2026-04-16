@@ -1,6 +1,7 @@
 package com.expensetracker.app.ui.screens.transaction
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -60,7 +61,9 @@ import com.expensetracker.app.core.model.TransactionType
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
+import com.expensetracker.app.ui.theme.adaptiveFlowLayout
 import com.expensetracker.app.ui.theme.appButtonSizing
+import com.expensetracker.app.ui.theme.financialFigures
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -286,24 +289,33 @@ fun TransactionTypeSelector(
     selectedType: TransactionType,
     onTypeChange: (TransactionType) -> Unit
 ) {
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        maxItemsInEachRow = 2
-    ) {
-        TransactionType.entries.forEach { type ->
-            FilterChip(
-                selected = selectedType == type,
-                onClick = { onTypeChange(type) },
-                label = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                leadingIcon = if (selectedType == type) {
-                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                } else {
-                    null
-                },
-                modifier = Modifier.fillMaxWidth(0.48f)
-            )
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val chipLayout = adaptiveFlowLayout(
+            maxWidth = maxWidth,
+            minItemWidth = 148.dp,
+            spacing = 8.dp,
+            maxColumns = 2
+        )
+
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            maxItemsInEachRow = chipLayout.columns
+        ) {
+            TransactionType.entries.forEach { type ->
+                FilterChip(
+                    selected = selectedType == type,
+                    onClick = { onTypeChange(type) },
+                    label = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                    leadingIcon = if (selectedType == type) {
+                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    } else {
+                        null
+                    },
+                    modifier = Modifier.fillMaxWidth(chipLayout.itemFraction)
+                )
+            }
         }
     }
 }
@@ -330,7 +342,7 @@ fun AmountInput(
         textStyle = MaterialTheme.typography.headlineMedium.copy(
             fontWeight = FontWeight.Bold,
             color = if (isExpense) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-        ),
+        ).financialFigures(FontWeight.ExtraBold),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("transaction_amount_input"),
