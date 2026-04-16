@@ -5,9 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.expensetracker.app.core.data.repository.AccountRepository
 import com.expensetracker.app.core.model.Account
 import com.expensetracker.app.core.model.AccountType
+import com.expensetracker.app.statement.StatementParseException
+import com.expensetracker.app.statement.StatementParseFailure
 import com.expensetracker.app.statement.StatementImportPreview
 import com.expensetracker.app.statement.StatementImportRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,9 +18,17 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private data class SelectedStatementDocument(
+    val name: String,
+    val mimeType: String?,
+    val bytes: ByteArray
+)
+
 data class StatementImportUiState(
     val accounts: List<Account> = emptyList(),
     val selectedAccountId: Long? = null,
+    val selectedDocumentName: String? = null,
+    val selectedDocumentRequiresPassword: Boolean = false,
     val documentPassword: String = "",
     val pastedText: String = "",
     val preview: StatementImportPreview? = null,
@@ -34,6 +45,9 @@ class StatementImportViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(StatementImportUiState())
     val uiState: StateFlow<StatementImportUiState> = _uiState.asStateFlow()
+    private var selectedDocument: SelectedStatementDocument? = null
+    private var selectedDocumentToken: Long = 0L
+    private var previewJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -68,35 +82,70 @@ class StatementImportViewModel @Inject constructor(
         mimeType: String?,
         bytes: ByteArray
     ) {
+        selectedDocument = SelectedStatementDocument(
+            name = documentName,
+            mimeType = mimeType,
+            bytes = bytes
+        )
+        selectedDocumentToken += 1
+
+        _uiState.update {
+            it.copy(
+                selectedDocumentName = documentName,
+                selectedDocumentRequiresPassword = false,
+                preview = null,
+                message = null
+            )
+        }
+
+        previewSelectedDocument()
+    }
+
+    fun previewSelectedDocument() {
+        val document = selectedDocument
+        if (document == null) {
+            _uiState.update { it.copy(message = "Choose a statement file first.") }
+            return
+        }
+
+        val token = selectedDocumentToken
         val password = _uiState.value.documentPassword.takeIf { it.isNotBlank() }
 
-        viewModelScope.launch {
+        previewJob?.cancel()
+        previewJob = viewModelScope.launch {
             _uiState.update { it.copy(isParsing = true, message = null) }
             val result = runCatching {
                 statementImportRepository.previewDocument(
-                    documentName = documentName,
-                    mimeType = mimeType,
-                    bytes = bytes,
+                    documentName = document.name,
+                    mimeType = document.mimeType,
+                    bytes = document.bytes,
                     password = password
                 )
             }
 
             _uiState.update { state ->
+                if (token != selectedDocumentToken) {
+                    return@update state
+                }
+
                 result.fold(
                     onSuccess = { preview ->
                         state.copy(
                             isParsing = false,
+                            selectedDocumentRequiresPassword = false,
                             preview = preview,
                             message = if (preview.entries.isEmpty()) {
-                                "No statement rows could be parsed from $documentName."
+                                "No statement rows could be parsed from ${document.name}."
                             } else {
-                                "Parsed ${preview.entries.size} entries from $documentName."
+                                "Parsed ${preview.entries.size} entries from ${document.name}."
                             }
                         )
                     },
                     onFailure = { error ->
                         state.copy(
                             isParsing = false,
+                            preview = null,
+                            selectedDocumentRequiresPassword = error.requiresPasswordRetry(),
                             message = error.message ?: "Unable to read that statement right now."
                         )
                     }
@@ -197,5 +246,12 @@ class StatementImportViewModel @Inject constructor(
 
     fun clearMessage() {
         _uiState.update { it.copy(message = null) }
+    }
+
+    private fun Throwable.requiresPasswordRetry(): Boolean {
+        return this is StatementParseException && (
+            failure == StatementParseFailure.PASSWORD_REQUIRED ||
+                failure == StatementParseFailure.INVALID_PASSWORD
+            )
     }
 }

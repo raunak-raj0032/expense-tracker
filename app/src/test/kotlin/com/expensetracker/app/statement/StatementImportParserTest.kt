@@ -116,6 +116,7 @@ class StatementImportParserTest {
             fail("Expected StatementParseException for missing PDF password")
         } catch (e: StatementParseException) {
             assertTrue(e.message.contains("password-protected"))
+            assertEquals(StatementParseFailure.PASSWORD_REQUIRED, e.failure)
         }
     }
 
@@ -133,13 +134,14 @@ class StatementImportParserTest {
             fail("Expected StatementParseException for incorrect PDF password")
         } catch (e: StatementParseException) {
             assertTrue(e.message.contains("incorrect"))
+            assertEquals(StatementParseFailure.INVALID_PASSWORD, e.failure)
         }
     }
 
     @Test
     fun parseExceptionHasMessageAndCause() {
         val cause = IllegalStateException("PDF error")
-        val exception = StatementParseException("Test message", cause)
+        val exception = StatementParseException("Test message", cause = cause)
         
         assertEquals("Test message", exception.message)
         assertEquals(cause, exception.cause)

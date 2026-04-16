@@ -29,8 +29,15 @@ data class StatementImportDraft(
     val fingerprint: String
 )
 
+enum class StatementParseFailure {
+    PASSWORD_REQUIRED,
+    INVALID_PASSWORD,
+    UNKNOWN
+}
+
 class StatementParseException(
     override val message: String,
+    val failure: StatementParseFailure = StatementParseFailure.UNKNOWN,
     override val cause: Throwable? = null
 ) : RuntimeException(message, cause)
 
@@ -155,6 +162,11 @@ class StatementImportParser @Inject constructor(
                 } else {
                     "The password for '$documentName' is incorrect. Check it and try again."
                 },
+                failure = if (normalizedPassword == null) {
+                    StatementParseFailure.PASSWORD_REQUIRED
+                } else {
+                    StatementParseFailure.INVALID_PASSWORD
+                },
                 cause = error
             )
         } catch (error: StatementParseException) {
@@ -163,6 +175,7 @@ class StatementImportParser @Inject constructor(
             throw StatementParseException(
                 message = "Unable to read PDF file. The document may be corrupted or use an unsupported format. " +
                     "If it is scanned, export it to text/CSV or paste the statement text instead.",
+                failure = StatementParseFailure.UNKNOWN,
                 cause = error
             )
         }

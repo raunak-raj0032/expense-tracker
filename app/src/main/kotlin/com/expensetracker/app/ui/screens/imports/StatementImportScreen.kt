@@ -271,6 +271,7 @@ fun StatementImportScreen(
                                         )
                                     )
                                 },
+                                enabled = !uiState.isParsing,
                                 modifier = Modifier
                                     .fillMaxWidth(actionLayout.itemFraction)
                                     .appButtonSizing()
@@ -289,6 +290,43 @@ fun StatementImportScreen(
                                 Icon(Icons.Default.AutoAwesome, contentDescription = null)
                                 Spacer(modifier = Modifier.size(8.dp))
                                 Text("Parse Pasted")
+                            }
+                        }
+                    }
+
+                    uiState.selectedDocumentName?.let { documentName ->
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "Selected file",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = documentName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                if (uiState.selectedDocumentRequiresPassword) {
+                                    Text(
+                                        text = "This statement is locked. Enter the PDF password below, then parse the selected file again.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                } else {
+                                    Text(
+                                        text = "You can re-parse this file without opening the picker again.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
@@ -329,6 +367,31 @@ fun StatementImportScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+
+                    if (uiState.selectedDocumentName != null) {
+                        Button(
+                            onClick = viewModel::previewSelectedDocument,
+                            enabled = !uiState.isParsing && (
+                                !uiState.selectedDocumentRequiresPassword ||
+                                    uiState.documentPassword.isNotBlank()
+                                ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .appButtonSizing()
+                        ) {
+                            Icon(Icons.Default.Description, contentDescription = null)
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text(
+                                if (uiState.selectedDocumentRequiresPassword) {
+                                    "Unlock & Parse Selected File"
+                                } else if (uiState.isParsing) {
+                                    "Parsing Selected File..."
+                                } else {
+                                    "Parse Selected File"
+                                }
+                            )
+                        }
+                    }
 
                     OutlinedTextField(
                         value = uiState.pastedText,
