@@ -44,6 +44,26 @@ function Try-Connect {
     return (Test-WirelessDevice -Endpoint $Endpoint)
 }
 
+function Install-DebugApk {
+    param(
+        [string]$Endpoint,
+        [string]$ProjectDir
+    )
+
+    $apkPath = Join-Path $ProjectDir "app\build\outputs\apk\debug\app-debug.apk"
+    if (-not (Test-Path $apkPath)) {
+        Write-Error "APK not found at $apkPath after build."
+        exit 1
+    }
+
+    Write-Host "      Installing APK over adb to $Endpoint ..." -ForegroundColor Yellow
+    & $adb -s $Endpoint install --no-streaming -r $apkPath
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "adb install failed for $Endpoint."
+        exit 1
+    }
+}
+
 function Pair-NewDevice {
     Write-Host "`nPairing a new device." -ForegroundColor Cyan
     Write-Host "  On your phone: Settings -> Developer options -> Wireless debugging -> 'Pair device with pairing code'" -ForegroundColor Yellow
@@ -115,12 +135,16 @@ if (-not $NoBuild) {
     Set-Location $projectDir
     & ".\gradlew.bat" `
         "-Pandroid.injected.build.abi=arm64-v8a" `
-        "-Pandroid.injected.device.serial=$endpoint" `
-        installDebug
+        assembleDebug
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "Gradle installDebug failed."
+        Write-Error "Gradle assembleDebug failed."
         exit 1
     }
+    if (-not (Test-WirelessDevice -Endpoint $endpoint) -and -not (Try-Connect -Endpoint $endpoint)) {
+        Write-Error "Wireless device disconnected before install."
+        exit 1
+    }
+    Install-DebugApk -Endpoint $endpoint -ProjectDir $projectDir
     Write-Host "      Debug app installed on $endpoint." -ForegroundColor Green
 } else {
     Write-Host "`n[2/3] Skipping build." -ForegroundColor Yellow
