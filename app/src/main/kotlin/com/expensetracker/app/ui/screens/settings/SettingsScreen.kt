@@ -67,7 +67,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.expensetracker.app.ui.theme.AccentDivider
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.NeonPill
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
@@ -84,7 +85,8 @@ fun SettingsScreen(
     onOpenBudget: () -> Unit = {},
     onOpenStatementImport: () -> Unit = {},
     isDarkModeEnabled: Boolean = true,
-    onDarkModeChange: (Boolean) -> Unit = {}
+    onDarkModeChange: (Boolean) -> Unit = {},
+    viewModel: SettingsViewModel = hiltViewModel()
 ) {
     var showBackupDialog  by remember { mutableStateOf(false) }
     var showResetDialog   by remember { mutableStateOf(false) }
@@ -92,11 +94,21 @@ fun SettingsScreen(
     var visible           by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope             = rememberCoroutineScope()
+    val biometricEnabled by viewModel.biometricEnabled.collectAsStateWithLifecycle()
+    val resettingData by viewModel.resettingData.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { delay(60); visible = true }
 
     fun showPrototypeMessage(title: String) {
         scope.launch { snackbarHostState.showSnackbar("$title is not available in this build yet.") }
+    }
+
+    LaunchedEffect(message) {
+        message?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearMessage()
+        }
     }
 
     Scaffold(
@@ -196,7 +208,16 @@ fun SettingsScreen(
 
             // Security
             item { SettingsSectionLabel("Security") }
-            item { SettingsItem(Icons.Default.Lock, "App Lock", "Lock app with PIN or biometric", accent = MaterialTheme.colorScheme.primary) { showPrototypeMessage("App Lock") } }
+            item {
+                SettingsToggleItem(
+                    icon = Icons.Default.Lock,
+                    title = "App Lock",
+                    subtitle = "Require face or fingerprint before the app opens",
+                    checked = biometricEnabled,
+                    accent = MaterialTheme.colorScheme.primary,
+                    onCheckedChange = viewModel::setBiometricEnabled
+                )
+            }
 
             // About
             item { SettingsSectionLabel("About") }
@@ -239,8 +260,8 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.width(14.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Reset All Data", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-                                Text("Permanently delete all transactions and settings", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Delete All Entries", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                                Text("Permanently delete all local transactions, imports, budgets, and suggestions", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                         }
@@ -253,16 +274,23 @@ fun SettingsScreen(
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
-            title            = { Text("Reset All Data?", fontWeight = FontWeight.ExtraBold) },
-            text             = { Text("This permanently deletes all transactions, accounts, categories, and settings. This cannot be undone.") },
+            title            = { Text("Delete All Entries?", fontWeight = FontWeight.ExtraBold) },
+            text             = { Text("This permanently deletes all local transactions, imported statement results, capture suggestions, budgets, and other ledger entries. Default starter accounts, categories, and tags will be recreated.") },
             confirmButton    = {
                 TextButton(
-                    onClick = { showResetDialog = false; showPrototypeMessage("Reset All Data") },
+                    onClick = {
+                        showResetDialog = false
+                        viewModel.deleteAllEntries()
+                    },
+                    enabled = !resettingData,
                     colors  = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete everything") }
+                ) { Text(if (resettingData) "Deleting..." else "Delete everything") }
             },
             dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) { Text("Cancel") }
+                TextButton(
+                    onClick = { showResetDialog = false },
+                    enabled = !resettingData
+                ) { Text("Cancel") }
             }
         )
     }
