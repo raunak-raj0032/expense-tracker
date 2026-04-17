@@ -42,8 +42,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.expensetracker.app.core.model.CalendarDay
@@ -89,7 +90,7 @@ fun CalendarScreen(
     onTransactionClick: (Long) -> Unit,
     viewModel: CalendarViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
     var viewMode by remember { mutableStateOf(CalendarViewMode.MONTH) }
@@ -535,13 +536,20 @@ private fun SummaryPill(
         shape = MaterialTheme.shapes.small,
         color = accent.copy(alpha = 0.12f)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text(label, style = MaterialTheme.typography.bodySmall)
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = accent
+                color = accent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -762,7 +770,7 @@ private fun DaySummaryCard(
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             SummaryPill(
                 label = "Spent",
@@ -777,7 +785,7 @@ private fun DaySummaryCard(
                 modifier = Modifier.weight(1f)
             )
             SummaryPill(
-                label = "Transactions",
+                label = "Txns",
                 value = transactionCount.toString(),
                 accent = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f)
@@ -807,5 +815,33 @@ private fun LocalDate.coerceIn(start: LocalDate, end: LocalDate): LocalDate {
         this < start -> start
         this > end -> end
         else -> this
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 720)
+@Composable
+private fun CalendarScreenPreview() {
+    val month = YearMonth.now()
+    val today = LocalDate.now()
+    val sampleDays = mapOf(
+        today to CalendarDay(today, 125000, 50000, -75000, 3),
+        today.minusDays(2) to CalendarDay(today.minusDays(2), 42000, 0, -42000, 1)
+    )
+    MaterialTheme {
+        Column(modifier = Modifier.padding(16.dp)) {
+            CalendarGrid(
+                yearMonth = month,
+                calendarDays = sampleDays,
+                selectedDate = today,
+                onDateClick = {}
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            DaySummaryCard(
+                date = today,
+                expenseTotal = 125000,
+                incomeTotal = 50000,
+                transactionCount = 3
+            )
+        }
     }
 }

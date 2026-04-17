@@ -53,8 +53,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -92,7 +92,7 @@ fun StatementImportScreen(
     onNavigateBack: () -> Unit,
     viewModel: StatementImportViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var accountDropdownExpanded by remember { mutableStateOf(false) }
@@ -168,39 +168,28 @@ fun StatementImportScreen(
                         subtitle = "Pick a PDF, CSV, or paste statement text, preview the parsed entries, then import only what is not already in your books."
                     )
 
-                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                        val badgeLayout = adaptiveFlowLayout(
-                            maxWidth = maxWidth,
-                            minItemWidth = 116.dp,
-                            spacing = 10.dp,
-                            maxColumns = 3
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        StatBadge(
+                            label = "Supports",
+                            value = "PDF / CSV",
+                            modifier = Modifier.weight(1f),
+                            accent = MaterialTheme.colorScheme.primary
                         )
-
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            maxItemsInEachRow = badgeLayout.columns
-                        ) {
-                            StatBadge(
-                                label = "Supports",
-                                value = "PDF / CSV",
-                                modifier = Modifier.fillMaxWidth(badgeLayout.itemFraction),
-                                accent = MaterialTheme.colorScheme.primary
-                            )
-                            StatBadge(
-                                label = "Paste",
-                                value = "Raw text",
-                                modifier = Modifier.fillMaxWidth(badgeLayout.itemFraction),
-                                accent = MaterialTheme.colorScheme.secondary
-                            )
-                            StatBadge(
-                                label = "Duplicates",
-                                value = "Skipped",
-                                modifier = Modifier.fillMaxWidth(badgeLayout.itemFraction),
-                                accent = MaterialTheme.colorScheme.tertiary
-                            )
-                        }
+                        StatBadge(
+                            label = "Paste",
+                            value = "Raw text",
+                            modifier = Modifier.weight(1f),
+                            accent = MaterialTheme.colorScheme.secondary
+                        )
+                        StatBadge(
+                            label = "Duplicates",
+                            value = "Skipped",
+                            modifier = Modifier.weight(1f),
+                            accent = MaterialTheme.colorScheme.tertiary
+                        )
                     }
                 }
             }
@@ -492,39 +481,28 @@ fun StatementImportScreen(
                             subtitle = "${preview.entries.size} parsed entries, ${preview.duplicateCount} duplicates, ${preview.ignoredLineCount} ignored lines"
                         )
 
-                        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                            val badgeLayout = adaptiveFlowLayout(
-                                maxWidth = maxWidth,
-                                minItemWidth = 116.dp,
-                                spacing = 10.dp,
-                                maxColumns = 3
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            StatBadge(
+                                label = "Expense",
+                                value = formatAmount(preview.expenseTotal),
+                                modifier = Modifier.weight(1f),
+                                accent = MaterialTheme.colorScheme.error
                             )
-
-                            FlowRow(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                                maxItemsInEachRow = badgeLayout.columns
-                            ) {
-                                StatBadge(
-                                    label = "Expense",
-                                    value = formatAmount(preview.expenseTotal),
-                                    modifier = Modifier.fillMaxWidth(badgeLayout.itemFraction),
-                                    accent = MaterialTheme.colorScheme.error
-                                )
-                                StatBadge(
-                                    label = "Income",
-                                    value = formatAmount(preview.incomeTotal),
-                                    modifier = Modifier.fillMaxWidth(badgeLayout.itemFraction),
-                                    accent = MaterialTheme.colorScheme.secondary
-                                )
-                                StatBadge(
-                                    label = "Importable",
-                                    value = (preview.entries.size - preview.duplicateCount).coerceAtLeast(0).toString(),
-                                    modifier = Modifier.fillMaxWidth(badgeLayout.itemFraction),
-                                    accent = MaterialTheme.colorScheme.primary
-                                )
-                            }
+                            StatBadge(
+                                label = "Income",
+                                value = formatAmount(preview.incomeTotal),
+                                modifier = Modifier.weight(1f),
+                                accent = MaterialTheme.colorScheme.secondary
+                            )
+                            StatBadge(
+                                label = "Importable",
+                                value = (preview.entries.size - preview.duplicateCount).coerceAtLeast(0).toString(),
+                                modifier = Modifier.weight(1f),
+                                accent = MaterialTheme.colorScheme.primary
+                            )
                         }
 
                         Button(
