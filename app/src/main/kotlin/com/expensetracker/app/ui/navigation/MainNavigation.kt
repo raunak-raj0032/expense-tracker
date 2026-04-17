@@ -38,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -57,6 +58,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expensetracker.app.auth.AuthState
+import com.expensetracker.app.auth.AuthViewModel
+import com.expensetracker.app.core.prefs.UserPreferences
+import com.expensetracker.app.ui.screens.login.LoginScreen
+import com.expensetracker.app.ui.screens.onboarding.OnboardingScreen
+import com.expensetracker.app.ui.screens.profile.ProfileScreen
 import com.expensetracker.app.ui.screens.budget.BudgetSetupScreen
 import com.expensetracker.app.ui.screens.analytics.AnalyticsScreen
 import com.expensetracker.app.ui.screens.calendar.CalendarScreen
@@ -97,8 +106,40 @@ fun MainNavigation(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    val shouldShowBottomBar = bottomNavItems.any { item ->
+    val authViewModel: AuthViewModel = hiltViewModel()
+    val authState by authViewModel.authState.collectAsStateWithLifecycle()
+    val gateViewModel: AppGateViewModel = hiltViewModel()
+    val onboardingSeen by gateViewModel.onboardingSeen.collectAsStateWithLifecycle()
+
+    LaunchedEffect(authState, onboardingSeen) {
+        val seen = onboardingSeen ?: return@LaunchedEffect
+        val target = when {
+            !seen -> Screen.Onboarding.route
+            authState is AuthState.SignedOut -> Screen.Login.route
+            authState is AuthState.SignedIn -> Screen.Home.route
+            else -> null
+        } ?: return@LaunchedEffect
+        val gatedRoutes = setOf(Screen.Onboarding.route, Screen.Login.route)
+        val current = currentDestination?.route
+        val needsRedirect = when (target) {
+            Screen.Onboarding.route, Screen.Login.route -> current != target
+            else -> current in gatedRoutes
+        }
+        if (needsRedirect) {
+            navController.navigate(target) {
+                popUpTo(0) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
+
+    val shouldShowBottomBar = authState is AuthState.SignedIn && bottomNavItems.any { item ->
         currentDestination?.hierarchy?.any { it.route == item.route } == true
+    }
+    val startDestination = when {
+        onboardingSeen == false -> Screen.Onboarding.route
+        authState is AuthState.SignedIn -> Screen.Home.route
+        else -> Screen.Login.route
     }
 
     AuroraBackground {
@@ -134,9 +175,25 @@ fun MainNavigation(
         ) { innerPadding ->
             NavHost(
                 navController    = navController,
-                startDestination = Screen.Home.route,
+                startDestination = startDestination,
                 modifier         = Modifier.padding(innerPadding)
             ) {
+                composable(Screen.Onboarding.route) {
+                    OnboardingScreen(onFinish = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        }
+                    })
+                }
+                composable(Screen.Login.route) {
+                    LoginScreen(viewModel = authViewModel)
+                }
+                composable(Screen.Profile.route) {
+                    ProfileScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        authViewModel = authViewModel
+                    )
+                }
                 composable(Screen.Home.route) {
                     HomeScreen(
                         onAddTransaction     = { navController.navigate(Screen.AddTransaction.route) },
@@ -144,7 +201,8 @@ fun MainNavigation(
                         onOpenBudget         = { navController.navigate(Screen.Budgets.route) },
                         onOpenCaptureInbox   = { navController.navigate(Screen.CaptureInbox.route) },
                         onOpenStatementImport= { navController.navigate(Screen.Import.route) },
-                        onTransactionClick   = { navController.navigate(Screen.EditTransaction.createRoute(it)) }
+                        onTransactionClick   = { navController.navigate(Screen.EditTransaction.createRoute(it)) },
+                        onOpenProfile        = { navController.navigate(Screen.Profile.route) }
                     )
                 }
                 composable(Screen.Ledger.route) {
@@ -214,7 +272,6 @@ private fun PremiumNavBar(
     val primary       = MaterialTheme.colorScheme.primary
     val surface       = MaterialTheme.colorScheme.surface
     val surfaceVariant= MaterialTheme.colorScheme.surfaceVariant
-    val background    = MaterialTheme.colorScheme.background
 
     Box(
         modifier = Modifier
@@ -250,12 +307,13 @@ private fun PremiumNavBar(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 items.forEach { item ->
                     val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
                     NavBarItem(
+                        modifier = Modifier.weight(1f),
                         item     = item,
                         selected = selected,
                         onClick  = { onItemClick(item) }
@@ -268,6 +326,7 @@ private fun PremiumNavBar(
 
 @Composable
 private fun NavBarItem(
+    modifier: Modifier = Modifier,
     item: BottomNavItem,
     selected: Boolean,
     onClick: () -> Unit
@@ -292,12 +351,13 @@ private fun NavBarItem(
     val interactionSource = remember { MutableInteractionSource() }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .clickable(
                 interactionSource = interactionSource,
                 indication        = null,
                 onClick           = onClick
             )
+            .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(5.dp)

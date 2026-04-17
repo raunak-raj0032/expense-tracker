@@ -55,8 +55,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -71,7 +71,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.IconButton
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.expensetracker.app.auth.AuthState
+import com.expensetracker.app.auth.AuthViewModel
 import com.expensetracker.app.core.model.Transaction
 import com.expensetracker.app.ui.theme.AccentDivider
 import com.expensetracker.app.ui.theme.GlassPanel
@@ -98,9 +102,13 @@ fun HomeScreen(
     onOpenCaptureInbox: () -> Unit,
     onOpenStatementImport: () -> Unit,
     onTransactionClick: (Long) -> Unit,
-    viewModel: HomeViewModel = hiltViewModel()
+    onOpenProfile: () -> Unit = {},
+    viewModel: HomeViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val authState by authViewModel.authState.collectAsStateWithLifecycle()
+    val firstName = (authState as? AuthState.SignedIn)?.user?.firstName.orEmpty()
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { delay(80); visible = true }
 
@@ -121,14 +129,14 @@ fun HomeScreen(
                                     .background(MaterialTheme.colorScheme.primary)
                             )
                             Text(
-                                text       = "Pocket Pulse",
+                                text       = if (firstName.isNotBlank()) "Hi, $firstName" else "Pocket Pulse",
                                 style      = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.ExtraBold,
                                 color      = MaterialTheme.colorScheme.onSurface
                             )
                         }
                         Text(
-                            text  = "Your daily money rhythm",
+                            text  = if (firstName.isNotBlank()) "Welcome back to Pocket Pulse" else "Your daily money rhythm",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -144,6 +152,13 @@ fun HomeScreen(
                             text       = "Ledger",
                             color      = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    IconButton(onClick = onOpenProfile) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Profile",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

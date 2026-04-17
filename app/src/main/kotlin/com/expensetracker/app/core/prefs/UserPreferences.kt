@@ -1,0 +1,45 @@
+package com.expensetracker.app.core.prefs
+
+import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
+
+private val Context.userPrefsDataStore by preferencesDataStore(name = "user_prefs")
+
+@Singleton
+class UserPreferences @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+    private val onboardingKey = booleanPreferencesKey("onboarding_seen")
+    private val biometricKey = booleanPreferencesKey("biometric_enabled")
+    private val lastSyncKey = longPreferencesKey("last_sync_millis")
+
+    val onboardingSeen: Flow<Boolean> = context.userPrefsDataStore.data.map { it[onboardingKey] ?: false }
+    val biometricEnabled: Flow<Boolean> = context.userPrefsDataStore.data.map { it[biometricKey] ?: false }
+    val lastSyncMillis: Flow<Long> = context.userPrefsDataStore.data.map { it[lastSyncKey] ?: 0L }
+
+    suspend fun setOnboardingSeen(seen: Boolean) {
+        context.userPrefsDataStore.edit { it[onboardingKey] = seen }
+    }
+
+    suspend fun setBiometricEnabled(enabled: Boolean) {
+        context.userPrefsDataStore.edit { it[biometricKey] = enabled }
+    }
+
+    suspend fun setLastSyncMillis(millis: Long) {
+        context.userPrefsDataStore.edit { it[lastSyncKey] = millis }
+    }
+
+    suspend fun clearSyncState() {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs.remove(lastSyncKey)
+        }
+    }
+}
