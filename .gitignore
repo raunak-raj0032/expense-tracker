@@ -2,6 +2,9 @@
 *.apk
 *.ap_
 
+# Wireless debug pairing cache
+.wireless-device.json
+
 # Files for the ART/Dalvik VM
 *.dex
 

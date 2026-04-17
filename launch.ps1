@@ -1,43 +1,60 @@
-# launch.ps1 — Build debug APK, start emulator, install & launch app
+# launch.ps1 - Build/debug helper for emulator install and fast relaunch loops
+
+param(
+    [switch]$NoBuild,
+    [switch]$NoInstall,
+    [switch]$RelaunchOnly
+)
 
 $ErrorActionPreference = "Stop"
 
-$sdkRoot   = if ($env:ANDROID_HOME) { $env:ANDROID_HOME }
-             elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT }
-             elseif (Test-Path "C:\android-sdk") { "C:\android-sdk" }
-             else { "$env:LOCALAPPDATA\Android\Sdk" }
-$emulator  = "$sdkRoot\emulator\emulator.exe"
-$adb       = "$sdkRoot\platform-tools\adb.exe"
-$projectDir= $PSScriptRoot
-$package   = "com.expensetracker.app"
+$sdkRoot = if ($env:ANDROID_HOME) {
+    $env:ANDROID_HOME
+} elseif ($env:ANDROID_SDK_ROOT) {
+    $env:ANDROID_SDK_ROOT
+} elseif (Test-Path "C:\android-sdk") {
+    "C:\android-sdk"
+} else {
+    "$env:LOCALAPPDATA\Android\Sdk"
+}
 
-# ── 0. Sanity-check SDK layout ───────────────────────────────────────────────
+$emulator = "$sdkRoot\emulator\emulator.exe"
+$adb = "$sdkRoot\platform-tools\adb.exe"
+$projectDir = $PSScriptRoot
+$package = "com.expensetracker.app"
+$activity = "com.expensetracker.app.ui.MainActivity"
+
+if ($RelaunchOnly) {
+    $NoBuild = $true
+    $NoInstall = $true
+}
+
 if (-not (Test-Path $emulator)) {
-    Write-Error "Emulator not found at $emulator. Install it via: `"$sdkRoot\cmdline-tools\latest\bin\sdkmanager.bat`" `"emulator`" `"platform-tools`""
-    exit 1
-}
-if (-not (Test-Path $adb)) {
-    Write-Error "adb not found at $adb. Install platform-tools via sdkmanager."
+    Write-Error "Emulator not found at $emulator. Install it with sdkmanager."
     exit 1
 }
 
-# ── 1. Pick first available AVD ──────────────────────────────────────────────
+if (-not (Test-Path $adb)) {
+    Write-Error "adb not found at $adb. Install platform-tools with sdkmanager."
+    exit 1
+}
+
 Write-Host "`n[1/4] Looking for AVDs..." -ForegroundColor Cyan
 $avdList = @(& $emulator -list-avds 2>&1 | Where-Object { $_ -match '\S' -and $_ -notmatch '^INFO' })
 if ($avdList.Count -eq 0) {
-    Write-Error "No AVDs found. Create one with: `"$sdkRoot\cmdline-tools\latest\bin\avdmanager.bat`" create avd -n pixel -k `"system-images;android-34;google_apis;x86_64`" -d pixel"
+    Write-Error "No AVDs found. Create one first with avdmanager."
     exit 1
 }
+
 $avd = "$($avdList[0])".Trim()
 Write-Host "      Using AVD: $avd" -ForegroundColor Green
 
-# ── 2. Start emulator if not already running ─────────────────────────────────
 Write-Host "`n[2/4] Checking emulator..." -ForegroundColor Cyan
 $running = & $adb devices | Select-String "emulator"
 if (-not $running) {
-    Write-Host "      Starting emulator (this may take ~30 seconds)..." -ForegroundColor Yellow
+    Write-Host "      Starting emulator..." -ForegroundColor Yellow
     Start-Process $emulator -ArgumentList "-avd `"$avd`"" -WindowStyle Hidden
-    # Wait until adb sees the device as online
+
     $timeout = 120
     $elapsed = 0
     do {
@@ -45,8 +62,12 @@ if (-not $running) {
         $elapsed += 3
         $online = & $adb devices | Select-String "emulator.*device$"
     } while (-not $online -and $elapsed -lt $timeout)
-    if (-not $online) { Write-Error "Emulator did not come online within $timeout seconds."; exit 1 }
-    # Wait for boot to complete
+
+    if (-not $online) {
+        Write-Error "Emulator did not come online within $timeout seconds."
+        exit 1
+    }
+
     Write-Host "      Waiting for boot to complete..." -ForegroundColor Yellow
     & $adb wait-for-device shell "while [[ -z \`$(getprop sys.boot_completed) ]]; do sleep 1; done"
     Write-Host "      Emulator ready." -ForegroundColor Green
@@ -54,17 +75,29 @@ if (-not $running) {
     Write-Host "      Emulator already running." -ForegroundColor Green
 }
 
-# ── 3. Build debug APK ───────────────────────────────────────────────────────
-Write-Host "`n[3/4] Building debug APK..." -ForegroundColor Cyan
-Set-Location $projectDir
-& ".\gradlew.bat" assembleDebug
-if ($LASTEXITCODE -ne 0) { Write-Error "Gradle build failed."; exit 1 }
-Write-Host "      Build successful." -ForegroundColor Green
+if (-not $NoBuild) {
+    Write-Host "`n[3/4] Building and installing debug app..." -ForegroundColor Cyan
+    Set-Location $projectDir
+    & ".\gradlew.bat" installDebug
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Gradle installDebug failed."
+        exit 1
+    }
+    Write-Host "      Debug app updated on device." -ForegroundColor Green
+} else {
+    Write-Host "`n[3/4] Skipping build." -ForegroundColor Yellow
+}
 
-# ── 4. Install & launch ──────────────────────────────────────────────────────
-Write-Host "`n[4/4] Installing & launching app..." -ForegroundColor Cyan
-$apk = Get-ChildItem -Path "$projectDir\app\build\outputs\apk\debug" -Filter "*.apk" | Select-Object -First 1
-& $adb install -r $apk.FullName
-& $adb shell monkey -p $package -c android.intent.category.LAUNCHER 1
+Write-Host "`n[4/4] Launching app..." -ForegroundColor Cyan
+if ($NoInstall) {
+    Write-Host "      Reusing existing installed app." -ForegroundColor Yellow
+}
 
-Write-Host "`nDone! App should be open on the emulator." -ForegroundColor Green
+& $adb shell am force-stop $package | Out-Null
+& $adb shell am start -n "${package}/${activity}" | Out-Null
+
+Write-Host "`nDone. App should be open on the emulator." -ForegroundColor Green
+Write-Host "Examples:" -ForegroundColor DarkGray
+Write-Host "  .\launch.ps1               # build, install, relaunch" -ForegroundColor DarkGray
+Write-Host "  .\launch.ps1 -NoBuild      # relaunch the installed app without rebuilding" -ForegroundColor DarkGray
+Write-Host "  .\launch.ps1 -RelaunchOnly # alias for -NoBuild -NoInstall" -ForegroundColor DarkGray
