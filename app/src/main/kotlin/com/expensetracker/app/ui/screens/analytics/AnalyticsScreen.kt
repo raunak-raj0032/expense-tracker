@@ -156,6 +156,44 @@ fun AnalyticsScreen(
                     MerchantBreakdownItem(merchant.merchantName, merchant.total, merchant.transactionCount)
                 }
             }
+
+            if (uiState.recurringSeries.isNotEmpty()) {
+                item {
+                    AnimatedVisibility(visible, enter = fadeIn(tween(400, 240))) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(modifier = Modifier.width(3.dp).height(20.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary))
+                            Column {
+                                Text("SUBSCRIPTIONS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary, letterSpacing = 1.2.sp)
+                                Text("Recurring charges we spotted", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+                items(uiState.recurringSeries) { series ->
+                    RecurringSeriesItem(series)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecurringSeriesItem(series: com.expensetracker.app.core.domain.RecurringSeries) {
+    GlassPanel(modifier = Modifier.fillMaxWidth(), accent = MaterialTheme.colorScheme.secondary) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(series.description.ifBlank { "Recurring charge" }, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text = "${series.cadence.label} · ${series.occurrences}\u00D7 · next ${series.nextExpected.format(DateTimeFormatter.ofPattern("MMM d"))}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = formatAmount(series.averageAmountMinor),
+                style = MaterialTheme.typography.titleSmall.financialFigures(FontWeight.ExtraBold),
+                color = MaterialTheme.colorScheme.secondary
+            )
         }
     }
 }

@@ -19,21 +19,30 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -46,8 +55,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -62,9 +73,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.expensetracker.app.core.model.Account
+import com.expensetracker.app.core.model.Category
+import com.expensetracker.app.core.model.Tag
 import com.expensetracker.app.core.model.TransactionType
 import com.expensetracker.app.ui.screens.home.TransactionListItem
 import com.expensetracker.app.ui.screens.home.formatAmount
@@ -79,6 +94,9 @@ import com.expensetracker.app.ui.theme.adaptiveFlowLayout
 import com.expensetracker.app.ui.theme.appButtonSizing
 import com.expensetracker.app.ui.theme.financialFigures
 import kotlinx.coroutines.delay
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -129,7 +147,15 @@ fun LedgerScreen(
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                     ) {
                         IconButton(onClick = { showFilterSheet = true }) {
-                            Icon(Icons.Default.FilterList, "Filter", tint = MaterialTheme.colorScheme.primary)
+                            BadgedBox(badge = {
+                                if (uiState.activeFilterCount > 0) {
+                                    Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                                        Text(uiState.activeFilterCount.toString())
+                                    }
+                                }
+                            }) {
+                                Icon(Icons.Default.FilterList, "Filter", tint = MaterialTheme.colorScheme.primary)
+                            }
                         }
                     }
                 }
@@ -216,12 +242,17 @@ fun LedgerScreen(
             shape              = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
         ) {
             FilterSheet(
-                selectedTypes    = uiState.selectedTypes,
-                selectedAccounts = uiState.selectedAccountIds,
-                onTypesChange    = viewModel::updateSelectedTypes,
-                onAccountsChange = viewModel::updateSelectedAccounts,
-                onApply          = { viewModel.applyFilters(); showFilterSheet = false },
-                onReset          = { viewModel.resetFilters(); showFilterSheet = false }
+                state              = uiState,
+                onTypesChange      = viewModel::updateSelectedTypes,
+                onAccountsChange   = viewModel::updateSelectedAccounts,
+                onCategoriesChange = viewModel::updateSelectedCategories,
+                onTagsChange       = viewModel::updateSelectedTags,
+                onDatePreset       = viewModel::setDatePreset,
+                onCustomRange      = viewModel::setCustomDateRange,
+                onMinAmountChange  = viewModel::updateMinAmount,
+                onMaxAmountChange  = viewModel::updateMaxAmount,
+                onApply            = { viewModel.applyFilters(); showFilterSheet = false },
+                onReset            = { viewModel.resetFilters(); showFilterSheet = false }
             )
         }
     }
@@ -292,43 +323,170 @@ fun EmptyLedgerState() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FilterSheet(
-    selectedTypes: Set<TransactionType>,
-    selectedAccounts: Set<Long>,
+    state: LedgerUiState,
     onTypesChange: (Set<TransactionType>) -> Unit,
     onAccountsChange: (Set<Long>) -> Unit,
+    onCategoriesChange: (Set<Long>) -> Unit,
+    onTagsChange: (Set<Long>) -> Unit,
+    onDatePreset: (DateRangePreset) -> Unit,
+    onCustomRange: (LocalDate, LocalDate) -> Unit,
+    onMinAmountChange: (String) -> Unit,
+    onMaxAmountChange: (String) -> Unit,
     onApply: () -> Unit,
     onReset: () -> Unit
 ) {
-    GlassPanel(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = ScreenEdgePadding, vertical = 8.dp),
-        accent   = MaterialTheme.colorScheme.primary
+    var showCustomPicker by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 680.dp)
+            .padding(horizontal = ScreenEdgePadding, vertical = 8.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text("FILTER", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.2.sp)
-            Text("Transactions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-            Text("Choose which types to display.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Refine results", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+            Text("Combine any filters below.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
-        AccentDivider()
+        FilterSection(title = "Type") {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    TransactionType.EXPENSE to "Expense",
+                    TransactionType.INCOME to "Income",
+                    TransactionType.TRANSFER to "Transfer",
+                    TransactionType.REFUND to "Refund"
+                ).forEach { (type, label) ->
+                    val selected = state.selectedTypes.contains(type)
+                    val accent = when (type) {
+                        TransactionType.EXPENSE -> MaterialTheme.colorScheme.error
+                        TransactionType.INCOME -> MaterialTheme.colorScheme.secondary
+                        else -> MaterialTheme.colorScheme.primary
+                    }
+                    FilterChip(
+                        selected = selected,
+                        onClick = {
+                            onTypesChange(if (selected) state.selectedTypes - type else state.selectedTypes + type)
+                        },
+                        label = { Text(label, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = accent.copy(alpha = 0.15f),
+                            selectedLabelColor = accent
+                        ),
+                        modifier = Modifier.testTag("ledger_filter_${label.lowercase()}")
+                    )
+                }
+            }
+        }
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(TransactionType.EXPENSE to "Expense", TransactionType.INCOME to "Income").forEach { (type, label) ->
-                val selected = selectedTypes.contains(type)
-                val accent   = if (type == TransactionType.EXPENSE) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
+        FilterSection(title = "Date") {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    DateRangePreset.ALL to "All time",
+                    DateRangePreset.THIS_MONTH to "This month",
+                    DateRangePreset.LAST_MONTH to "Last month",
+                    DateRangePreset.LAST_90_DAYS to "Last 90 days",
+                    DateRangePreset.YEAR_TO_DATE to "Year to date"
+                ).forEach { (preset, label) ->
+                    FilterChip(
+                        selected = state.datePreset == preset,
+                        onClick = { onDatePreset(preset) },
+                        label = { Text(label) }
+                    )
+                }
                 FilterChip(
-                    selected = selected,
-                    onClick  = {
-                        onTypesChange(if (selected) selectedTypes - type else selectedTypes + type)
+                    selected = state.datePreset == DateRangePreset.CUSTOM,
+                    onClick = { showCustomPicker = true },
+                    label = {
+                        val text = if (state.datePreset == DateRangePreset.CUSTOM && state.startDate != null && state.endDate != null) {
+                            val f = DateTimeFormatter.ofPattern("MMM d")
+                            "${state.startDate.format(f)} – ${state.endDate.format(f)}"
+                        } else "Custom"
+                        Text(text)
                     },
-                    label    = { Text(label, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) },
-                    colors   = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = accent.copy(alpha = 0.15f),
-                        selectedLabelColor     = accent
-                    ),
-                    modifier = Modifier.testTag("ledger_filter_${label.lowercase()}")
+                    leadingIcon = { Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp)) }
                 )
+            }
+        }
+
+        FilterSection(title = "Amount range") {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = state.minAmount,
+                    onValueChange = onMinAmountChange,
+                    label = { Text("Min") },
+                    leadingIcon = { Text("\u20B9") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.weight(1f).testTag("ledger_filter_min"),
+                    colors = filterFieldColors()
+                )
+                OutlinedTextField(
+                    value = state.maxAmount,
+                    onValueChange = onMaxAmountChange,
+                    label = { Text("Max") },
+                    leadingIcon = { Text("\u20B9") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.weight(1f).testTag("ledger_filter_max"),
+                    colors = filterFieldColors()
+                )
+            }
+        }
+
+        if (state.accounts.isNotEmpty()) {
+            FilterSection(title = "Accounts") {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.accounts.forEach { account ->
+                        val selected = state.selectedAccountIds.contains(account.id)
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                onAccountsChange(if (selected) state.selectedAccountIds - account.id else state.selectedAccountIds + account.id)
+                            },
+                            label = { Text(account.name) }
+                        )
+                    }
+                }
+            }
+        }
+
+        if (state.categories.isNotEmpty()) {
+            FilterSection(title = "Categories") {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.categories.forEach { category ->
+                        val selected = state.selectedCategoryIds.contains(category.id)
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                onCategoriesChange(if (selected) state.selectedCategoryIds - category.id else state.selectedCategoryIds + category.id)
+                            },
+                            label = { Text(category.name) }
+                        )
+                    }
+                }
+            }
+        }
+
+        if (state.tags.isNotEmpty()) {
+            FilterSection(title = "Tags") {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.tags.forEach { tag ->
+                        val selected = state.selectedTagIds.contains(tag.id)
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                onTagsChange(if (selected) state.selectedTagIds - tag.id else state.selectedTagIds + tag.id)
+                            },
+                            label = { Text(tag.name) }
+                        )
+                    }
+                }
             }
         }
 
@@ -337,21 +495,77 @@ fun FilterSheet(
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement   = Arrangement.spacedBy(8.dp),
-                maxItemsInEachRow     = layout.columns
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                maxItemsInEachRow = layout.columns
             ) {
                 OutlinedButton(
-                    onClick  = onReset,
+                    onClick = onReset,
                     modifier = Modifier.fillMaxWidth(layout.itemFraction).appButtonSizing().testTag("ledger_filter_reset"),
-                    shape    = MaterialTheme.shapes.large
+                    shape = MaterialTheme.shapes.large
                 ) { Text("Reset") }
                 Button(
-                    onClick  = onApply,
+                    onClick = onApply,
                     modifier = Modifier.fillMaxWidth(layout.itemFraction).appButtonSizing().testTag("ledger_filter_apply"),
-                    shape    = MaterialTheme.shapes.large,
-                    colors   = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
+                    shape = MaterialTheme.shapes.large,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                 ) { Text("Apply filters") }
             }
         }
     }
+
+    if (showCustomPicker) {
+        val pickerState = rememberDateRangePickerState(
+            initialSelectedStartDateMillis = state.startDate?.toEpochMillisStart(),
+            initialSelectedEndDateMillis = state.endDate?.toEpochMillisStart()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showCustomPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val startMs = pickerState.selectedStartDateMillis
+                    val endMs = pickerState.selectedEndDateMillis
+                    if (startMs != null && endMs != null) {
+                        onCustomRange(startMs.toLocalDate(), endMs.toLocalDate())
+                    }
+                    showCustomPicker = false
+                }) { Text("Apply") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCustomPicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DateRangePicker(
+                state = pickerState,
+                title = { Text("Custom range", modifier = Modifier.padding(start = 24.dp, top = 16.dp)) },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
 }
+
+@Composable
+private fun FilterSection(title: String, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            letterSpacing = 1.0.sp
+        )
+        content()
+    }
+}
+
+@Composable
+private fun filterFieldColors() = OutlinedTextFieldDefaults.colors(
+    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+    focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+)
+
+private fun LocalDate.toEpochMillisStart(): Long =
+    atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+private fun Long.toLocalDate(): LocalDate =
+    Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDate()

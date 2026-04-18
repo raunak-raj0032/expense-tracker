@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expensetracker.app.core.data.repository.CategoryRepository
 import com.expensetracker.app.core.data.repository.TransactionRepository
+import com.expensetracker.app.core.domain.RecurringDetector
+import com.expensetracker.app.core.domain.RecurringSeries
 import com.expensetracker.app.core.model.CategoryBreakdown
 import com.expensetracker.app.core.model.MerchantBreakdown
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,6 +34,7 @@ data class AnalyticsUiState(
     val previousIncome: Long = 0,
     val categoryBreakdown: List<CategoryAnalytics> = emptyList(),
     val merchantBreakdown: List<MerchantBreakdown> = emptyList(),
+    val recurringSeries: List<RecurringSeries> = emptyList(),
     val isLoading: Boolean = false
 )
 
@@ -85,6 +88,11 @@ class AnalyticsViewModel @Inject constructor(
 
             val merchantBreakdown = transactionRepository.getMerchantBreakdown(startOfMonth, endOfMonth, 10)
 
+            val lookbackStart = month.atEndOfMonth().minusMonths(12)
+            val lookbackEnd = month.atEndOfMonth()
+            val recent = transactionRepository.getForDateRange(lookbackStart, lookbackEnd)
+            val recurring = RecurringDetector.detect(recent)
+
             _uiState.update {
                 it.copy(
                     totalExpense = totalExpense,
@@ -93,6 +101,7 @@ class AnalyticsViewModel @Inject constructor(
                     previousIncome = previousIncome,
                     categoryBreakdown = categoryBreakdown,
                     merchantBreakdown = merchantBreakdown,
+                    recurringSeries = recurring,
                     isLoading = false
                 )
             }
