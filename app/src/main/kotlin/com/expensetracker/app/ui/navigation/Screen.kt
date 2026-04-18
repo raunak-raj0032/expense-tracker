@@ -3,6 +3,7 @@ package com.expensetracker.app.ui.navigation
 sealed class Screen(val route: String) {
     object Onboarding : Screen("onboarding")
     object Login : Screen("login")
+    object EmailAuth : Screen("email_auth")
     object Profile : Screen("profile")
     object Home : Screen("home")
     object Ledger : Screen("ledger")

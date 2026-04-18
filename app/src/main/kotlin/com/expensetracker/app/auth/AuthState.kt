@@ -4,7 +4,8 @@ data class AuthUser(
     val uid: String,
     val displayName: String?,
     val email: String?,
-    val photoUrl: String?
+    val photoUrl: String?,
+    val isAnonymous: Boolean = false
 ) {
     val firstName: String
         get() = displayName?.trim()?.split(' ')?.firstOrNull().orEmpty()

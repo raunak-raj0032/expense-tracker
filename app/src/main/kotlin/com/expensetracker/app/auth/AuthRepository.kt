@@ -36,7 +36,8 @@ class AuthRepository @Inject constructor(
                         uid = user.uid,
                         displayName = user.displayName,
                         email = user.email,
-                        photoUrl = user.photoUrl?.toString()
+                        photoUrl = user.photoUrl?.toString(),
+                        isAnonymous = user.isAnonymous
                     )
                 )
             )
@@ -75,10 +76,86 @@ class AuthRepository @Inject constructor(
         firebaseAuth.signInWithCredential(firebaseCredential).await()
     }
 
+    suspend fun signInWithEmail(email: String, password: String) {
+        val e = email.trim()
+        if (e.isEmpty() || password.isEmpty()) {
+            throw AuthException("Enter your email and password")
+        }
+        try {
+            firebaseAuth.signInWithEmailAndPassword(e, password).await()
+        } catch (t: Throwable) {
+            throw AuthException(friendlyAuthMessage(t), t)
+        }
+    }
+
+    suspend fun signUpWithEmail(email: String, password: String, displayName: String?) {
+        val e = email.trim()
+        if (e.isEmpty() || password.isEmpty()) {
+            throw AuthException("Enter your email and password")
+        }
+        if (password.length < 6) {
+            throw AuthException("Password must be at least 6 characters")
+        }
+        try {
+            val result = firebaseAuth.createUserWithEmailAndPassword(e, password).await()
+            val name = displayName?.trim().orEmpty()
+            if (name.isNotEmpty()) {
+                val update = com.google.firebase.auth.UserProfileChangeRequest.Builder()
+                    .setDisplayName(name)
+                    .build()
+                result.user?.updateProfile(update)?.await()
+                firebaseAuth.currentUser?.reload()?.await()
+            }
+        } catch (t: Throwable) {
+            throw AuthException(friendlyAuthMessage(t), t)
+        }
+    }
+
+    suspend fun sendPasswordReset(email: String) {
+        val e = email.trim()
+        if (e.isEmpty()) throw AuthException("Enter your email first")
+        try {
+            firebaseAuth.sendPasswordResetEmail(e).await()
+        } catch (t: Throwable) {
+            throw AuthException(friendlyAuthMessage(t), t)
+        }
+    }
+
+    suspend fun signInAnonymously() {
+        try {
+            firebaseAuth.signInAnonymously().await()
+        } catch (t: Throwable) {
+            throw AuthException(friendlyAuthMessage(t), t)
+        }
+    }
+
     suspend fun signOut() {
         firebaseAuth.signOut()
         runCatching {
             credentialManager.clearCredentialState(ClearCredentialStateRequest())
+        }
+    }
+
+    private fun friendlyAuthMessage(t: Throwable): String {
+        val raw = t.message.orEmpty()
+        return when {
+            raw.contains("password is invalid", ignoreCase = true) ||
+                raw.contains("INVALID_LOGIN_CREDENTIALS", ignoreCase = true) ||
+                raw.contains("wrong-password", ignoreCase = true) ->
+                "Incorrect email or password"
+            raw.contains("no user record", ignoreCase = true) ||
+                raw.contains("user-not-found", ignoreCase = true) ->
+                "No account found for this email"
+            raw.contains("email address is already", ignoreCase = true) ||
+                raw.contains("email-already-in-use", ignoreCase = true) ->
+                "An account already exists for this email"
+            raw.contains("badly formatted", ignoreCase = true) ||
+                raw.contains("invalid-email", ignoreCase = true) ->
+                "That email address doesn't look right"
+            raw.contains("network", ignoreCase = true) ->
+                "Network error — check your connection"
+            raw.isBlank() -> "Something went wrong, please try again"
+            else -> raw
         }
     }
 

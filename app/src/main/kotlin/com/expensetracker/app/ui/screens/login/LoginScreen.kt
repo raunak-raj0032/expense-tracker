@@ -34,6 +34,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -62,10 +64,12 @@ import com.expensetracker.app.ui.theme.ScreenEdgePadding
 
 @Composable
 fun LoginScreen(
-    viewModel: AuthViewModel = hiltViewModel()
+    viewModel: AuthViewModel = hiltViewModel(),
+    onContinueWithEmail: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val signingIn by viewModel.signingIn.collectAsStateWithLifecycle()
+    val guestBusy by viewModel.guestBusy.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
 
     val logoAnim = remember { Animatable(0f) }
@@ -172,6 +176,28 @@ fun LoginScreen(
                     onClick = { viewModel.signIn(context) }
                 )
 
+                Spacer(Modifier.height(12.dp))
+
+                SecondaryAuthButton(
+                    label = "Continue with email",
+                    icon = Icons.Default.Email,
+                    enabled = !signingIn && !guestBusy,
+                    onClick = {
+                        viewModel.clearError()
+                        onContinueWithEmail()
+                    }
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                SecondaryAuthButton(
+                    label = "Continue as guest",
+                    icon = Icons.Default.PersonOutline,
+                    loading = guestBusy,
+                    enabled = !signingIn,
+                    onClick = { viewModel.signInAsGuest() }
+                )
+
                 AnimatedVisibility(visible = error != null) {
                     Text(
                         text = error.orEmpty(),
@@ -258,6 +284,75 @@ private fun GoogleSignInButton(
                 Text(
                     text = "Continue with Google",
                     fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SecondaryAuthButton(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    loading: Boolean = false,
+    enabled: Boolean = true
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "secBtnScale"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .scale(scale)
+            .clip(RoundedCornerShape(16.dp))
+            .border(
+                width = 1.dp,
+                brush = Brush.horizontalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.25f)
+                    )
+                ),
+                shape = RoundedCornerShape(16.dp)
+            )
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f))
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled && !loading,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        if (loading) {
+            CircularProgressIndicator(
+                strokeWidth = 2.5.dp,
+                modifier = Modifier.size(20.dp),
+                color = MaterialTheme.colorScheme.primary
+            )
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = label,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }

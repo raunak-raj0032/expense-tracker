@@ -62,8 +62,24 @@ class BiometricViewModel @Inject constructor(
     private val _unlocked = MutableStateFlow(false)
     val unlocked: StateFlow<Boolean> = _unlocked.asStateFlow()
 
+    // Only relock if the app was backgrounded for longer than this. Using a
+    // short Android picker / share sheet / biometric prompt should NOT relock.
+    private val relockGraceMillis: Long = 30_000L
+    private var stoppedAt: Long = 0L
+
     fun markUnlocked() { _unlocked.value = true }
-    fun lock() { _unlocked.value = false }
+
+    fun onStop() {
+        stoppedAt = System.currentTimeMillis()
+    }
+
+    fun onStart() {
+        val stopped = stoppedAt
+        if (stopped != 0L && System.currentTimeMillis() - stopped > relockGraceMillis) {
+            _unlocked.value = false
+        }
+        stoppedAt = 0L
+    }
 }
 
 @Composable
@@ -78,8 +94,11 @@ fun BiometricGate(
 
     DisposableEffect(lifecycleOwner, enabled) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP && enabled) {
-                viewModel.lock()
+            if (!enabled) return@LifecycleEventObserver
+            when (event) {
+                Lifecycle.Event.ON_STOP -> viewModel.onStop()
+                Lifecycle.Event.ON_START -> viewModel.onStart()
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

@@ -15,4 +15,7 @@ class AppGateViewModel @Inject constructor(
 ) : ViewModel() {
     val onboardingSeen: StateFlow<Boolean?> = userPreferences.onboardingSeen
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    val homeCurrency: StateFlow<String> = userPreferences.homeCurrency
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "INR")
 }

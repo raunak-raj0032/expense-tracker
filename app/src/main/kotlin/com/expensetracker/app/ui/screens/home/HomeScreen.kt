@@ -848,11 +848,24 @@ fun TransactionListItem(
                 }
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                val homeCurrency = com.expensetracker.app.ui.money.LocalHomeCurrency.current
+                val sign = if (isIncome) "+" else "-"
+                val nativeText = "$sign${com.expensetracker.app.core.money.CurrencyConverter.formatAmount(transaction.amountMinor, transaction.currencyCode)}"
                 Text(
-                    text  = "${if (isIncome) "+" else "-"}${formatAmount(transaction.amountMinor)}",
+                    text  = nativeText,
                     style = MaterialTheme.typography.titleSmall.financialFigures(FontWeight.ExtraBold),
                     color = amountTint
                 )
+                if (!transaction.currencyCode.equals(homeCurrency, ignoreCase = true)) {
+                    val converted = com.expensetracker.app.core.money.CurrencyConverter.convert(
+                        transaction.amountMinor, transaction.currencyCode, homeCurrency
+                    )
+                    Text(
+                        text = "\u2248 ${com.expensetracker.app.core.money.CurrencyConverter.formatAmount(converted, homeCurrency)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 NeonPill(text = if (isIncome) "In" else "Out", accent = amountTint)
             }
         }

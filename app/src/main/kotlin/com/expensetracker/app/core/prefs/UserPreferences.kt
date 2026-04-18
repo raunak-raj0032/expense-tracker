@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -20,10 +21,12 @@ class UserPreferences @Inject constructor(
     private val onboardingKey = booleanPreferencesKey("onboarding_seen")
     private val biometricKey = booleanPreferencesKey("biometric_enabled")
     private val lastSyncKey = longPreferencesKey("last_sync_millis")
+    private val homeCurrencyKey = stringPreferencesKey("home_currency")
 
     val onboardingSeen: Flow<Boolean> = context.userPrefsDataStore.data.map { it[onboardingKey] ?: false }
     val biometricEnabled: Flow<Boolean> = context.userPrefsDataStore.data.map { it[biometricKey] ?: false }
     val lastSyncMillis: Flow<Long> = context.userPrefsDataStore.data.map { it[lastSyncKey] ?: 0L }
+    val homeCurrency: Flow<String> = context.userPrefsDataStore.data.map { it[homeCurrencyKey] ?: "INR" }
 
     suspend fun setOnboardingSeen(seen: Boolean) {
         context.userPrefsDataStore.edit { it[onboardingKey] = seen }
@@ -35,6 +38,10 @@ class UserPreferences @Inject constructor(
 
     suspend fun setLastSyncMillis(millis: Long) {
         context.userPrefsDataStore.edit { it[lastSyncKey] = millis }
+    }
+
+    suspend fun setHomeCurrency(code: String) {
+        context.userPrefsDataStore.edit { it[homeCurrencyKey] = code.uppercase() }
     }
 
     suspend fun clearSyncState() {

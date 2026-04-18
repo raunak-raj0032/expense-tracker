@@ -26,6 +26,16 @@ class SettingsViewModel @Inject constructor(
     val biometricEnabled: StateFlow<Boolean> = userPreferences.biometricEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val homeCurrency: StateFlow<String> = userPreferences.homeCurrency
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "INR")
+
+    fun setHomeCurrency(code: String) {
+        viewModelScope.launch {
+            userPreferences.setHomeCurrency(code)
+            _message.value = "Home currency set to $code."
+        }
+    }
+
     private val _resettingData = MutableStateFlow(false)
     val resettingData: StateFlow<Boolean> = _resettingData.asStateFlow()
 

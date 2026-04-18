@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -63,6 +64,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.auth.AuthState
 import com.expensetracker.app.auth.AuthViewModel
 import com.expensetracker.app.core.prefs.UserPreferences
+import com.expensetracker.app.ui.screens.login.EmailAuthScreen
 import com.expensetracker.app.ui.screens.login.LoginScreen
 import com.expensetracker.app.ui.screens.onboarding.OnboardingScreen
 import com.expensetracker.app.ui.screens.profile.ProfileScreen
@@ -110,6 +112,7 @@ fun MainNavigation(
     val authState by authViewModel.authState.collectAsStateWithLifecycle()
     val gateViewModel: AppGateViewModel = hiltViewModel()
     val onboardingSeen by gateViewModel.onboardingSeen.collectAsStateWithLifecycle()
+    val homeCurrency by gateViewModel.homeCurrency.collectAsStateWithLifecycle()
 
     LaunchedEffect(authState, onboardingSeen) {
         val seen = onboardingSeen ?: return@LaunchedEffect
@@ -119,10 +122,11 @@ fun MainNavigation(
             authState is AuthState.SignedIn -> Screen.Home.route
             else -> null
         } ?: return@LaunchedEffect
-        val gatedRoutes = setOf(Screen.Onboarding.route, Screen.Login.route)
+        val gatedRoutes = setOf(Screen.Onboarding.route, Screen.Login.route, Screen.EmailAuth.route)
         val current = currentDestination?.route
         val needsRedirect = when (target) {
-            Screen.Onboarding.route, Screen.Login.route -> current != target
+            Screen.Onboarding.route -> current != target
+            Screen.Login.route -> current != Screen.Login.route && current != Screen.EmailAuth.route
             else -> current in gatedRoutes
         }
         if (needsRedirect) {
@@ -173,6 +177,9 @@ fun MainNavigation(
                 }
             }
         ) { innerPadding ->
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.expensetracker.app.ui.money.LocalHomeCurrency provides homeCurrency
+            ) {
             NavHost(
                 navController    = navController,
                 startDestination = startDestination,
@@ -186,7 +193,16 @@ fun MainNavigation(
                     })
                 }
                 composable(Screen.Login.route) {
-                    LoginScreen(viewModel = authViewModel)
+                    LoginScreen(
+                        viewModel = authViewModel,
+                        onContinueWithEmail = { navController.navigate(Screen.EmailAuth.route) }
+                    )
+                }
+                composable(Screen.EmailAuth.route) {
+                    EmailAuthScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        viewModel = authViewModel
+                    )
                 }
                 composable(Screen.Profile.route) {
                     ProfileScreen(
@@ -259,6 +275,7 @@ fun MainNavigation(
                     )
                 }
             }
+            }
         }
     }
 }
@@ -303,7 +320,7 @@ private fun PremiumNavBar(
                         )
                     )
                 )
-                .padding(horizontal = 8.dp, vertical = 10.dp)
+                .padding(horizontal = 4.dp, vertical = 10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -358,7 +375,7 @@ private fun NavBarItem(
                 onClick           = onClick
             )
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .padding(horizontal = 2.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
@@ -386,7 +403,10 @@ private fun NavBarItem(
             text       = item.label,
             style      = MaterialTheme.typography.labelSmall,
             color      = if (selected) primary else onSurfaceVariant,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            maxLines   = 1,
+            softWrap   = false,
+            overflow   = TextOverflow.Visible
         )
 
         // Active dot indicator

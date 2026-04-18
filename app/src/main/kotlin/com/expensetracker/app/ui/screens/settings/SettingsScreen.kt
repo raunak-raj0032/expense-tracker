@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.Rule
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
@@ -69,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expensetracker.app.core.money.CurrencyConverter
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.NeonPill
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
@@ -91,10 +93,12 @@ fun SettingsScreen(
     var showBackupDialog  by remember { mutableStateOf(false) }
     var showResetDialog   by remember { mutableStateOf(false) }
     var showAboutDialog   by remember { mutableStateOf(false) }
+    var showCurrencyDialog by remember { mutableStateOf(false) }
     var visible           by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope             = rememberCoroutineScope()
     val biometricEnabled by viewModel.biometricEnabled.collectAsStateWithLifecycle()
+    val homeCurrency by viewModel.homeCurrency.collectAsStateWithLifecycle()
     val resettingData by viewModel.resettingData.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -164,6 +168,16 @@ fun SettingsScreen(
                         onCheckedChange = onDarkModeChange
                     )
                 }
+            }
+
+            item {
+                SettingsItem(
+                    icon = Icons.Default.CurrencyExchange,
+                    title = "Home currency",
+                    subtitle = "Totals convert to $homeCurrency",
+                    accent = MaterialTheme.colorScheme.primary,
+                    onClick = { showCurrencyDialog = true }
+                )
             }
 
             // Data
@@ -301,6 +315,40 @@ fun SettingsScreen(
             title            = { Text("Backup & Restore", fontWeight = FontWeight.ExtraBold) },
             text             = { Text("Backup and restore are not wired in this prototype yet, but the entry point is in place.") },
             confirmButton    = { TextButton(onClick = { showBackupDialog = false }) { Text("Got it") } }
+        )
+    }
+
+    if (showCurrencyDialog) {
+        AlertDialog(
+            onDismissRequest = { showCurrencyDialog = false },
+            title = { Text("Home currency", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    CurrencyConverter.supported.forEach { code ->
+                        val selected = code == homeCurrency
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.medium)
+                                .clickable {
+                                    viewModel.setHomeCurrency(code)
+                                    showCurrencyDialog = false
+                                }
+                                .padding(horizontal = 8.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "${CurrencyConverter.symbol(code)}  $code",
+                                modifier = Modifier.weight(1f),
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                            if (selected) Text("Selected", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showCurrencyDialog = false }) { Text("Close") } }
         )
     }
 
