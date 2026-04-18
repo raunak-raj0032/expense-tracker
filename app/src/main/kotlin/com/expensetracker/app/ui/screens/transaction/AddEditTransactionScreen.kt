@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -178,8 +179,32 @@ fun AddEditTransactionScreen(
             item {
                 GlassPanel(
                     modifier = Modifier.fillMaxWidth(),
+                    accent = MaterialTheme.colorScheme.tertiary
+                ) {
+                    OutlinedTextField(
+                        value = uiState.description,
+                        onValueChange = viewModel::updateDescription,
+                        label = { Text("Description (e.g. Uber, Starbucks)") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("transaction_description_input"),
+                        colors = fieldColors()
+                    )
+                }
+            }
+
+            item {
+                GlassPanel(
+                    modifier = Modifier.fillMaxWidth(),
                     accent = MaterialTheme.colorScheme.secondary
                 ) {
+                    CategorySuggestionBanner(
+                        suggestedCategoryId = uiState.suggestedCategoryId,
+                        categories = uiState.categories,
+                        onAccept = viewModel::acceptSuggestedCategory,
+                        onDismiss = viewModel::dismissSuggestion
+                    )
                     CategorySelector(
                         selectedCategory = uiState.categoryId,
                         categories = uiState.categories,
@@ -349,6 +374,32 @@ fun AmountInput(
         singleLine = true,
         colors = fieldColors()
     )
+}
+
+@Composable
+fun CategorySuggestionBanner(
+    suggestedCategoryId: Long?,
+    categories: List<Category>,
+    onAccept: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val suggestion = suggestedCategoryId?.let { id -> categories.firstOrNull { it.id == id } } ?: return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "Suggested: ${suggestion.name}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f)
+        )
+        TextButton(onClick = onDismiss) { Text("Dismiss") }
+        Button(onClick = onAccept) { Text("Apply") }
+    }
 }
 
 @Composable

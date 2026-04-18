@@ -24,6 +24,8 @@ data class AddEditTransactionUiState(
     val amount: String = "",
     val accountId: Long = 0,
     val categoryId: Long? = null,
+    val categoryManuallyChosen: Boolean = false,
+    val suggestedCategoryId: Long? = null,
     val counterpartyAccountId: Long? = null,
     val description: String = "",
     val notes: String = "",
@@ -115,11 +117,59 @@ class AddEditTransactionViewModel @Inject constructor(
     }
 
     fun updateCategory(categoryId: Long) {
-        _uiState.update { it.copy(categoryId = categoryId) }
+        _uiState.update { it.copy(categoryId = categoryId, categoryManuallyChosen = true) }
+    }
+
+    fun updateDescription(description: String) {
+        _uiState.update { it.copy(description = description) }
+        suggestCategoryFor(description)
     }
 
     fun updateNotes(notes: String) {
         _uiState.update { it.copy(notes = notes) }
+    }
+
+    fun acceptSuggestedCategory() {
+        val suggestion = _uiState.value.suggestedCategoryId ?: return
+        _uiState.update { it.copy(categoryId = suggestion, categoryManuallyChosen = true, suggestedCategoryId = null) }
+    }
+
+    fun dismissSuggestion() {
+        _uiState.update { it.copy(suggestedCategoryId = null) }
+    }
+
+    private fun suggestCategoryFor(description: String) {
+        val query = description.trim()
+        if (query.length < 3) {
+            _uiState.update { it.copy(suggestedCategoryId = null) }
+            return
+        }
+        viewModelScope.launch {
+            val all = transactionRepository.getAll()
+            val matches = all.filter { tx ->
+                val txDesc = tx.description?.trim().orEmpty()
+                txDesc.isNotEmpty() &&
+                    tx.type == _uiState.value.transactionType &&
+                    tx.categoryId != null &&
+                    tx.id != _uiState.value.transactionId &&
+                    (txDesc.equals(query, ignoreCase = true) ||
+                        txDesc.contains(query, ignoreCase = true) ||
+                        query.contains(txDesc, ignoreCase = true))
+            }
+            val topCategory = matches
+                .groupingBy { it.categoryId!! }
+                .eachCount()
+                .maxByOrNull { it.value }
+                ?.key
+
+            _uiState.update { state ->
+                val shouldAutoApply = !state.categoryManuallyChosen && state.categoryId == null && topCategory != null
+                state.copy(
+                    suggestedCategoryId = topCategory?.takeIf { it != state.categoryId },
+                    categoryId = if (shouldAutoApply) topCategory else state.categoryId
+                )
+            }
+        }
     }
 
     fun toggleTag(tagId: Long) {

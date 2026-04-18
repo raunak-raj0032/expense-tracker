@@ -57,6 +57,9 @@ class TransactionRepository @Inject constructor(
         return transactionDao.getForDateRange(startTime, endTime).map { it.toDomain() }
     }
 
+    suspend fun getAll(): List<Transaction> =
+        transactionDao.getAll().map { it.toDomain() }
+
     suspend fun insert(transaction: Transaction): Long {
         val entity = transaction.toEntity()
         val id = transactionDao.insert(entity)

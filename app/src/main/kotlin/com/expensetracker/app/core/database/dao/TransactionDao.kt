@@ -21,6 +21,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE deletedAt IS NULL ORDER BY transactionTime DESC")
     fun observeAll(): Flow<List<TransactionEntity>>
 
+    @Query("SELECT * FROM transactions WHERE deletedAt IS NULL ORDER BY transactionTime DESC")
+    suspend fun getAll(): List<TransactionEntity>
+
     @Query("SELECT * FROM transactions WHERE deletedAt IS NULL AND accountId = :accountId ORDER BY transactionTime DESC")
     fun observeByAccount(accountId: Long): Flow<List<TransactionEntity>>
 
