@@ -1,10 +1,7 @@
 package com.expensetracker.app.ui.screens.transaction
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -62,7 +59,6 @@ import com.expensetracker.app.core.model.TransactionType
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
-import com.expensetracker.app.ui.theme.adaptiveFlowLayout
 import com.expensetracker.app.ui.theme.appButtonSizing
 import com.expensetracker.app.ui.theme.financialFigures
 
@@ -309,39 +305,29 @@ fun AddEditTransactionScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TransactionTypeSelector(
     selectedType: TransactionType,
     onTypeChange: (TransactionType) -> Unit
 ) {
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val chipLayout = adaptiveFlowLayout(
-            maxWidth = maxWidth,
-            minItemWidth = 148.dp,
-            spacing = 8.dp,
-            maxColumns = 2
-        )
-
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            maxItemsInEachRow = chipLayout.columns
-        ) {
-            TransactionType.entries.forEach { type ->
-                FilterChip(
-                    selected = selectedType == type,
-                    onClick = { onTypeChange(type) },
-                    label = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                    leadingIcon = if (selectedType == type) {
-                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    } else {
-                        null
-                    },
-                    modifier = Modifier.fillMaxWidth(chipLayout.itemFraction)
-                )
-            }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TransactionType.entries.forEach { type ->
+            FilterChip(
+                selected = selectedType == type,
+                onClick = { onTypeChange(type) },
+                label = {
+                    Text(
+                        text = type.name.lowercase().replaceFirstChar { it.uppercase() },
+                        maxLines = 1,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                },
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
@@ -476,15 +462,33 @@ fun AccountSelector(
 fun TagSelector(
     selectedTags: Set<Long>,
     tags: List<Tag>,
-    onTagToggle: (Long) -> Unit
+    onTagToggle: (Long) -> Unit,
+    onCreateTag: (String) -> Unit
 ) {
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var newTagName by remember { mutableStateOf("") }
+
     Column {
-        Text(
-            text = "Tags",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Tags",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = {
+                newTagName = ""
+                showCreateDialog = true
+            }) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.size(4.dp))
+                Text("New tag")
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -501,6 +505,34 @@ fun TagSelector(
                 )
             }
         }
+    }
+
+    if (showCreateDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreateDialog = false },
+            title = { Text("New Tag") },
+            text = {
+                OutlinedTextField(
+                    value = newTagName,
+                    onValueChange = { newTagName = it },
+                    label = { Text("Tag name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onCreateTag(newTagName)
+                        showCreateDialog = false
+                    },
+                    enabled = newTagName.trim().isNotEmpty()
+                ) { Text("Create") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 
