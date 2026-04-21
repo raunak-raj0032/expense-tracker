@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -148,6 +150,24 @@ fun BudgetSetupScreen(
                         text = if (uiState.isSaving) "Saving..." else "Save Monthly Budget",
                         modifier = Modifier.padding(start = 8.dp)
                     )
+                }
+            }
+
+            if (uiState.existingAmountMinor != null) {
+                item {
+                    OutlinedButton(
+                        onClick = viewModel::removeBudget,
+                        enabled = !uiState.isSaving,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .appButtonSizing()
+                    ) {
+                        Icon(Icons.Default.DeleteOutline, contentDescription = null)
+                        Text(
+                            text = "Remove Budget",
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
                 }
             }
         }

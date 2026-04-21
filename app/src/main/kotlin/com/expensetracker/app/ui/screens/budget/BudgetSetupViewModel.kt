@@ -55,6 +55,30 @@ class BudgetSetupViewModel @Inject constructor(
         }
     }
 
+    fun removeBudget() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true, error = null) }
+            try {
+                budgetRepository.removeMonthlyBudget()
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        isSaved = true,
+                        amount = "",
+                        existingAmountMinor = null
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isSaving = false,
+                        error = e.message ?: "Unable to remove budget right now."
+                    )
+                }
+            }
+        }
+    }
+
     fun saveBudget() {
         viewModelScope.launch {
             val amountMinor = _uiState.value.amount

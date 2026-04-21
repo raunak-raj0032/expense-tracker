@@ -31,6 +31,16 @@ class BudgetRepository @Inject constructor(
         }
     }
 
+    suspend fun removeMonthlyBudget(month: YearMonth = YearMonth.now()) {
+        val existing = budgetDao.getLatestEnabledByPeriod(BudgetPeriodType.MONTHLY.name)
+            ?.takeIf {
+                val existingStart = it.startDate.toLocalDate()
+                val existingEnd = it.endDate?.toLocalDate()
+                existingStart <= month.atEndOfMonth() && (existingEnd == null || existingEnd >= month.atDay(1))
+            } ?: return
+        budgetDao.disable(existing.id)
+    }
+
     suspend fun upsertMonthlyBudget(
         amountMinor: Long,
         name: String = "Monthly Budget",
