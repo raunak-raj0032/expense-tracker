@@ -326,11 +326,13 @@ class StatementImportParser @Inject constructor(
     }
 
     private fun parseFreeformText(sourceName: String, text: String): ParsedStatementSource {
-        val lines = text.lineSequence()
+        val lines = mergeFreeformContinuationLines(
+            text.lineSequence()
             .map { it.trim() }
             .filter { it.isNotBlank() }
             .filterNot { skipLineKeywords.any { kw -> it.contains(kw, ignoreCase = true) } }
             .toList()
+        )
 
         var ignoredLineCount = 0
         val entries = mutableListOf<StatementImportDraft>()
@@ -398,12 +400,14 @@ class StatementImportParser @Inject constructor(
         var amountMinor: Long? = null
         var direction: TransactionType = TransactionType.EXPENSE
         var amountIndex = -1
+        var amountCandidate: MonetaryCandidate? = null
         
         for ((i, seg) in segments.withIndex()) {
             val candidate = selectTransactionAmountCandidate(findMonetaryCandidates(seg))
             if (candidate != null) {
                 amountMinor = candidate.amountMinor
                 amountIndex = i
+                amountCandidate = candidate
                 
                 val hasCr = candidate.raw.contains("cr", ignoreCase = true)
                 val hasDr = candidate.raw.contains("dr", ignoreCase = true)
@@ -423,6 +427,8 @@ class StatementImportParser @Inject constructor(
             val candidate = selectTransactionAmountCandidate(findMonetaryCandidates(rawContent))
             if (candidate != null) {
                 amountMinor = candidate.amountMinor
+                amountCandidate = candidate
+                amountIndex = segments.indexOfFirst { it.contains(candidate.raw) }
                 val hasCr = candidate.raw.contains("cr", ignoreCase = true)
                 val hasDr = candidate.raw.contains("dr", ignoreCase = true)
                 direction = when {
@@ -438,11 +444,12 @@ class StatementImportParser @Inject constructor(
             return null
         }
 
-        val description = segments.filterIndexed { i, _ -> i != amountIndex }
-            .joinToString(" ")
-            .normalizeWhitespace()
-            .takeIf { it.isNotBlank() }
-            ?: line.replace(Regex("[0-9.,\\s]+"), "").take(50)
+        val description = buildFreeformDescription(
+            segments = segments,
+            amountIndex = amountIndex,
+            amountCandidate = amountCandidate,
+            fallbackLine = line
+        )
 
         return buildDraft(
             sourceName = sourceName,
@@ -564,6 +571,101 @@ class StatementImportParser @Inject constructor(
             lower.contains("neft/") ||
             lower.contains("rtgs/") ||
             lower.contains("transfer")
+    }
+
+    private fun mergeFreeformContinuationLines(lines: List<String>): List<String> {
+        if (lines.size < 2) {
+            return lines
+        }
+
+        val merged = mutableListOf<String>()
+        var current = lines.first()
+
+        for (line in lines.drop(1)) {
+            if (shouldMergeWithPreviousLine(previousLine = current, line = line)) {
+                current = "$current $line".normalizeWhitespace()
+            } else {
+                merged += current
+                current = line
+            }
+        }
+
+        merged += current
+        return merged
+    }
+
+    private fun shouldMergeWithPreviousLine(previousLine: String, line: String): Boolean {
+        if (findDateInLine(line) != null || findDateInLine(previousLine) == null) {
+            return false
+        }
+
+        val previousHasAmount = hasTransactionAmount(previousLine)
+        val currentHasAmount = hasTransactionAmount(line)
+        return !previousHasAmount || !currentHasAmount
+    }
+
+    private fun hasTransactionAmount(line: String): Boolean {
+        val normalized = line.normalizeWhitespace()
+        return selectTransactionAmountCandidate(findMonetaryCandidates(normalized)) != null
+    }
+
+    private fun buildFreeformDescription(
+        segments: List<String>,
+        amountIndex: Int,
+        amountCandidate: MonetaryCandidate?,
+        fallbackLine: String
+    ): String {
+        val description = segments.mapIndexedNotNull { index, segment ->
+            val withoutChosenAmount = if (index == amountIndex && amountCandidate != null) {
+                segment.replaceFirst(amountCandidate.raw, " ")
+            } else {
+                segment
+            }
+
+            sanitizeFreeformDescriptionSegment(withoutChosenAmount).takeIf { it.isNotBlank() }
+        }
+            .joinToString(" ")
+            .normalizeWhitespace()
+
+        if (description.isNotBlank()) {
+            return description
+        }
+
+        return fallbackLine.replace(Regex("[0-9.,\\s]+"), "").take(50)
+    }
+
+    private fun sanitizeFreeformDescriptionSegment(segment: String): String {
+        var cleaned = segment.normalizeWhitespace()
+        if (cleaned.isBlank() || cleaned == "-") {
+            return ""
+        }
+
+        while (cleaned.startsWith("-")) {
+            cleaned = cleaned.removePrefix("-").trim()
+        }
+
+        while (true) {
+            val amountMatch = amountRegex.find(cleaned)
+            if (amountMatch == null || amountMatch.range.first != 0) {
+                break
+            }
+            cleaned = cleaned.substring(amountMatch.range.last + 1).trim()
+        }
+
+        while (true) {
+            val replaced = cleaned.replace(
+                Regex("\\s+-\\s+(?:(?:â‚¹|rs\\.?|inr)\\s*)?[0-9][0-9,]*(?:\\.\\d{1,2})?(?:\\s*(?:cr|dr))?", RegexOption.IGNORE_CASE),
+                " "
+            ).normalizeWhitespace()
+            if (replaced == cleaned) {
+                break
+            }
+            cleaned = replaced
+        }
+
+        return cleaned
+            .trim('-', '|', ':')
+            .normalizeWhitespace()
     }
 
     private fun stripAllDates(line: String): String {

@@ -315,6 +315,48 @@ class StatementImportParserTest {
         assertTrue(parsed.entries.none { it.description.contains("SPOTIFY", ignoreCase = true) })
     }
 
+    @Test
+    fun mergesWrappedPdfLinesIntoSingleFreeformTransaction() {
+        val text = """
+            08 Apr 26 AMAZON PAY INDIA
+            PRIV LTD 3,587.50 D
+            09 Apr 26 INTEREST CREDIT 50.00 C
+        """.trimIndent()
+
+        val parsed = parser.parseText(
+            sourceName = "wrapped-pdf-extract.txt",
+            rawText = text
+        )
+
+        assertEquals(2, parsed.entries.size)
+        assertEquals(0, parsed.ignoredLineCount)
+        assertEquals("AMAZON PAY INDIA PRIV LTD", parsed.entries[0].description)
+        assertEquals(358_750L, parsed.entries[0].amountMinor)
+        assertEquals(TransactionType.EXPENSE, parsed.entries[0].direction)
+        assertEquals(5_000L, parsed.entries[1].amountMinor)
+        assertEquals(TransactionType.INCOME, parsed.entries[1].direction)
+    }
+
+    @Test
+    fun keepsContinuationTextButDropsBalanceOverflowFromDescription() {
+        val text = """
+            01/03/2026  01/03/2026  WDL TFR                     -           69.00            -  1,728.23
+            UPI/DR/606043409272/Google
+            A/utib/playstoreg/UPI
+        """.trimIndent()
+
+        val parsed = parser.parseText(
+            sourceName = "wrapped-balance-extract.txt",
+            rawText = text
+        )
+
+        assertEquals(1, parsed.entries.size)
+        assertEquals(6_900L, parsed.entries[0].amountMinor)
+        assertTrue(parsed.entries[0].description.contains("UPI/DR/606043409272/Google"))
+        assertTrue(parsed.entries[0].description.contains("A/utib/playstoreg/UPI"))
+        assertTrue(parsed.entries[0].description.contains("1,728.23").not())
+    }
+
     private fun createPasswordProtectedPdf(password: String): ByteArray {
         return PDDocument().use { document ->
             val page = PDPage()

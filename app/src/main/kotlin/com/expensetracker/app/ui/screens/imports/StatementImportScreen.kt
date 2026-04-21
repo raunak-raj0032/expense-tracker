@@ -66,6 +66,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.expensetracker.app.core.model.TransactionType
@@ -569,7 +570,9 @@ private fun StatementPreviewCard(entry: StatementPreviewEntry) {
                 Text(
                     text = entry.description,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -587,7 +590,9 @@ private fun StatementPreviewCard(entry: StatementPreviewEntry) {
                     Text(
                         text = detail,
                         style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = MaterialTheme.colorScheme.secondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -597,7 +602,9 @@ private fun StatementPreviewCard(entry: StatementPreviewEntry) {
                     text = formatAmount(entry.amountMinor),
                     style = MaterialTheme.typography.titleMedium,
                     color = accent,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (entry.isDuplicate) {
                     Text(
