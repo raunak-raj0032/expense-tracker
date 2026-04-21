@@ -71,7 +71,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -107,8 +109,14 @@ fun SettingsScreen(
     val scope             = rememberCoroutineScope()
     val biometricEnabled by viewModel.biometricEnabled.collectAsStateWithLifecycle()
     val homeCurrency by viewModel.homeCurrency.collectAsStateWithLifecycle()
+    val autoCaptureEnabled by viewModel.autoCaptureEnabled.collectAsStateWithLifecycle()
     val resettingData by viewModel.resettingData.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var showAutoCaptureSheet by remember { mutableStateOf(false) }
+    val smsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { /* result reflected on next composition via hasSmsAccess() */ }
 
     LaunchedEffect(Unit) { delay(60); visible = true }
 
@@ -192,10 +200,25 @@ fun SettingsScreen(
             item { SettingsSectionLabel("Data") }
             item { SettingsItem(Icons.Default.AccountBalance, "Accounts",    "Manage your accounts",         accent = MaterialTheme.colorScheme.secondary) { showPrototypeMessage("Accounts") } }
             item { SettingsItem(Icons.Default.Category,       "Categories",  "Manage categories",            accent = MaterialTheme.colorScheme.secondary) { showPrototypeMessage("Categories") } }
-            item { SettingsItem(Icons.AutoMirrored.Filled.Label, "Tags",     "Manage tags",                  accent = MaterialTheme.colorScheme.secondary) { showPrototypeMessage("Tags") } }
+            item { SettingsItem(Icons.AutoMirrored.Filled.Label, "Tags",     "Manage tags",                  accent = MaterialTheme.colorScheme.secondary, onClick = onOpenTags) }
 
             // Automation
             item { SettingsSectionLabel("Automation") }
+            item {
+                SettingsToggleItem(
+                    icon     = Icons.Default.Notifications,
+                    title    = "Auto-import UPI transactions",
+                    subtitle = "High-confidence payments from PhonePe, GPay & banks land in your ledger automatically. Peer transfers stay in review.",
+                    checked  = autoCaptureEnabled,
+                    accent   = MaterialTheme.colorScheme.tertiary,
+                    onCheckedChange = { enabled ->
+                        viewModel.setAutoCaptureEnabled(enabled)
+                        if (enabled && !(hasNotificationListenerAccess(context) && hasSmsAccess(context))) {
+                            showAutoCaptureSheet = true
+                        }
+                    }
+                )
+            }
             item {
                 SettingsItem(
                     icon     = Icons.Default.Notifications,
@@ -360,6 +383,32 @@ fun SettingsScreen(
         )
     }
 
+    if (showAutoCaptureSheet) {
+        AlertDialog(
+            onDismissRequest = { showAutoCaptureSheet = false },
+            title = { Text("Enable auto-import", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("To pick up UPI transactions automatically we need two permissions. Everything stays on your device.")
+                    Text("• Notification access — reads payment alerts from PhonePe, GPay, Paytm, BHIM and bank apps.", style = MaterialTheme.typography.bodySmall)
+                    Text("• SMS access — reads bank UPI debit/credit messages so card and net-banking transactions get captured too.", style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    context.startActivity(Intent(AndroidSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                }) { Text("Grant notification access") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    smsPermissionLauncher.launch(
+                        arrayOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS)
+                    )
+                }) { Text("Grant SMS access") }
+            }
+        )
+    }
+
     if (showAboutDialog) {
         AlertDialog(
             onDismissRequest = { showAboutDialog = false },
@@ -461,3 +510,17 @@ fun SettingsItem(
 // Keep old function name for compatibility
 @Composable
 fun SettingsSection(title: String) = SettingsSectionLabel(title)
+
+private fun hasSmsAccess(context: Context): Boolean {
+    val read = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
+    val receive = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+    return read && receive
+}
+
+private fun hasNotificationListenerAccess(context: Context): Boolean {
+    val enabled = AndroidSettings.Secure.getString(
+        context.contentResolver,
+        "enabled_notification_listeners"
+    ).orEmpty()
+    return enabled.contains(context.packageName)
+}

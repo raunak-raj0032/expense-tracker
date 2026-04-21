@@ -14,8 +14,10 @@ import com.expensetracker.app.core.model.ParseStatus
 import com.expensetracker.app.core.model.Transaction
 import com.expensetracker.app.core.model.TransactionStatus
 import com.expensetracker.app.core.model.TransactionType
+import com.expensetracker.app.core.prefs.UserPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.time.Instant
 import java.time.LocalDateTime
@@ -32,7 +34,8 @@ class CaptureEventRepository @Inject constructor(
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
     private val merchantDao: MerchantDao,
-    private val parserRegistry: NotificationParserRegistry
+    private val parserRegistry: NotificationParserRegistry,
+    private val userPreferences: UserPreferences
 ) {
 
     fun observeReviewQueue(): Flow<List<CaptureSuggestion>> {
@@ -209,7 +212,17 @@ class CaptureEventRepository @Inject constructor(
             fingerprintHash = parseResult.fingerprint
         )
 
-        captureEventDao.insert(entity)
+        val eventId = captureEventDao.insert(entity)
+
+        if (eventId > 0L
+            && entity.parseStatus == ParseStatus.SUCCESS.name
+            && !parseResult.isPeerTransfer
+            && parseResult.confidence >= 0.8f
+            && userPreferences.autoCaptureEnabled.first()
+        ) {
+            runCatching { addToLedger(eventId) }
+        }
+
         return true
     }
 

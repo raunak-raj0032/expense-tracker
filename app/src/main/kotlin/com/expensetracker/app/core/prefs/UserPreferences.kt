@@ -22,11 +22,13 @@ class UserPreferences @Inject constructor(
     private val biometricKey = booleanPreferencesKey("biometric_enabled")
     private val lastSyncKey = longPreferencesKey("last_sync_millis")
     private val homeCurrencyKey = stringPreferencesKey("home_currency")
+    private val autoCaptureKey = booleanPreferencesKey("auto_capture_enabled")
 
     val onboardingSeen: Flow<Boolean> = context.userPrefsDataStore.data.map { it[onboardingKey] ?: false }
     val biometricEnabled: Flow<Boolean> = context.userPrefsDataStore.data.map { it[biometricKey] ?: false }
     val lastSyncMillis: Flow<Long> = context.userPrefsDataStore.data.map { it[lastSyncKey] ?: 0L }
     val homeCurrency: Flow<String> = context.userPrefsDataStore.data.map { it[homeCurrencyKey] ?: "INR" }
+    val autoCaptureEnabled: Flow<Boolean> = context.userPrefsDataStore.data.map { it[autoCaptureKey] ?: false }
 
     suspend fun setOnboardingSeen(seen: Boolean) {
         context.userPrefsDataStore.edit { it[onboardingKey] = seen }
@@ -42,6 +44,10 @@ class UserPreferences @Inject constructor(
 
     suspend fun setHomeCurrency(code: String) {
         context.userPrefsDataStore.edit { it[homeCurrencyKey] = code.uppercase() }
+    }
+
+    suspend fun setAutoCaptureEnabled(enabled: Boolean) {
+        context.userPrefsDataStore.edit { it[autoCaptureKey] = enabled }
     }
 
     suspend fun clearSyncState() {
