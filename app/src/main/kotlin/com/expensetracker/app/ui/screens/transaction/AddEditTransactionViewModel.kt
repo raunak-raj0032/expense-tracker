@@ -172,6 +172,19 @@ class AddEditTransactionViewModel @Inject constructor(
         }
     }
 
+    fun createTag(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            try {
+                val newId = tagRepository.insert(Tag(name = trimmed))
+                _uiState.update { it.copy(selectedTags = it.selectedTags + newId) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
     fun toggleTag(tagId: Long) {
         _uiState.update {
             val newTags = if (it.selectedTags.contains(tagId)) {

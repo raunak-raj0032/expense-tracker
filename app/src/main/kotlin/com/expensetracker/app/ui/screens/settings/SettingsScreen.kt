@@ -1,5 +1,12 @@
 package com.expensetracker.app.ui.screens.settings
 
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.provider.Settings as AndroidSettings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -86,6 +93,7 @@ fun SettingsScreen(
     onOpenCaptureInbox: () -> Unit = {},
     onOpenBudget: () -> Unit = {},
     onOpenStatementImport: () -> Unit = {},
+    onOpenTags: () -> Unit = {},
     isDarkModeEnabled: Boolean = true,
     onDarkModeChange: (Boolean) -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()

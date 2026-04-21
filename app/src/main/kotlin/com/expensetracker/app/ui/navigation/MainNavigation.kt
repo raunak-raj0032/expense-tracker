@@ -76,6 +76,7 @@ import com.expensetracker.app.ui.screens.home.HomeScreen
 import com.expensetracker.app.ui.screens.imports.StatementImportScreen
 import com.expensetracker.app.ui.screens.ledger.LedgerScreen
 import com.expensetracker.app.ui.screens.settings.SettingsScreen
+import com.expensetracker.app.ui.screens.tags.TagsManagementScreen
 import com.expensetracker.app.ui.screens.transaction.AddEditTransactionScreen
 import com.expensetracker.app.ui.theme.AuroraBackground
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
@@ -246,9 +247,13 @@ fun MainNavigation(
                         onOpenCaptureInbox    = { navController.navigate(Screen.CaptureInbox.route) },
                         onOpenBudget          = { navController.navigate(Screen.Budgets.route) },
                         onOpenStatementImport = { navController.navigate(Screen.Import.route) },
+                        onOpenTags            = { navController.navigate(Screen.Tags.route) },
                         isDarkModeEnabled     = darkThemeEnabled,
                         onDarkModeChange      = onDarkThemeChange
                     )
+                }
+                composable(Screen.Tags.route) {
+                    TagsManagementScreen(onNavigateBack = { navController.popBackStack() })
                 }
                 composable(Screen.Budgets.route) {
                     BudgetSetupScreen(onNavigateBack = { navController.popBackStack() })
