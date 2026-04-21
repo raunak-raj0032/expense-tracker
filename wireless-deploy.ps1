@@ -29,16 +29,35 @@ if (-not (Test-Path $adb)) {
     exit 1
 }
 
+function Invoke-Adb {
+    param(
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Arguments
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        return & $adb @Arguments 2>&1
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+}
+
+function Ensure-AdbServer {
+    $null = Invoke-Adb start-server
+}
+
 function Test-WirelessDevice {
     param([string]$Endpoint)
-    $devices = & $adb devices 2>&1
+    $devices = Invoke-Adb devices
     return ($devices | Select-String -Pattern "^$([regex]::Escape($Endpoint))\s+device$" -Quiet)
 }
 
 function Try-Connect {
     param([string]$Endpoint)
     Write-Host "      adb connect $Endpoint" -ForegroundColor DarkGray
-    $out = & $adb connect $Endpoint 2>&1
+    $out = Invoke-Adb connect $Endpoint
     Write-Host "      $out" -ForegroundColor DarkGray
     Start-Sleep -Milliseconds 800
     return (Test-WirelessDevice -Endpoint $Endpoint)
@@ -57,7 +76,7 @@ function Install-DebugApk {
     }
 
     Write-Host "      Installing APK over adb to $Endpoint ..." -ForegroundColor Yellow
-    & $adb -s $Endpoint install --no-streaming -r $apkPath
+    Invoke-Adb -s $Endpoint install --no-streaming -r $apkPath | Out-Host
     if ($LASTEXITCODE -ne 0) {
         Write-Error "adb install failed for $Endpoint."
         exit 1
@@ -75,7 +94,7 @@ function Pair-NewDevice {
 
     $pairEndpoint = "${pairHost}:${pairPort}"
     Write-Host "`n  Pairing with $pairEndpoint ..." -ForegroundColor Cyan
-    $pairOut = & $adb pair $pairEndpoint $pairCode 2>&1
+    $pairOut = Invoke-Adb pair $pairEndpoint $pairCode
     Write-Host "  $pairOut" -ForegroundColor DarkGray
 
     if ($pairOut -notmatch "Successfully paired") {
@@ -97,6 +116,8 @@ function Pair-NewDevice {
     Write-Host "      Saved device to $stateFile" -ForegroundColor Green
     return $connectEndpoint
 }
+
+Ensure-AdbServer
 
 Write-Host "`n[1/3] Checking wireless connection..." -ForegroundColor Cyan
 
@@ -154,8 +175,8 @@ Write-Host "`n[3/3] Launching app..." -ForegroundColor Cyan
 if ($NoLaunch) {
     Write-Host "      Skipped (-NoLaunch)." -ForegroundColor Yellow
 } else {
-    & $adb -s $endpoint shell am force-stop $package | Out-Null
-    & $adb -s $endpoint shell am start -n "${package}/${activity}" | Out-Null
+    Invoke-Adb -s $endpoint shell am force-stop $package | Out-Null
+    Invoke-Adb -s $endpoint shell am start -n "${package}/${activity}" | Out-Null
     Write-Host "      Launched on $endpoint." -ForegroundColor Green
 }
 
