@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
@@ -77,6 +78,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expensetracker.app.ai.AiAvailability
+import com.expensetracker.app.ai.AiCompatibility
 import com.expensetracker.app.core.money.CurrencyConverter
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.NeonPill
@@ -109,6 +112,9 @@ fun SettingsScreen(
     val homeCurrency by viewModel.homeCurrency.collectAsStateWithLifecycle()
     val resettingData by viewModel.resettingData.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val aiAvailability by viewModel.aiAvailability.collectAsStateWithLifecycle()
+    val aiEnabled by viewModel.aiEnabled.collectAsStateWithLifecycle()
+    val aiBusy by viewModel.aiBusy.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showBatteryOptSheet by remember { mutableStateOf(false) }
 
@@ -236,6 +242,19 @@ fun SettingsScreen(
             }
             item { SettingsItem(Icons.AutoMirrored.Filled.Rule, "Rules",       "Automation rules",                  accent = MaterialTheme.colorScheme.tertiary) { showPrototypeMessage("Rules") } }
             item { SettingsItem(Icons.Default.Receipt,           "Suggestions", "Review inferred transactions",      accent = MaterialTheme.colorScheme.tertiary, onClick = onOpenCaptureInbox) }
+
+            // On-device AI
+            item { SettingsSectionLabel("On-device AI") }
+            item {
+                AiSettingsCard(
+                    availability = aiAvailability,
+                    aiEnabled = aiEnabled,
+                    busy = aiBusy,
+                    onToggleEnabled = viewModel::setAiEnabled,
+                    onDownload = viewModel::downloadAiModel,
+                    onDelete = viewModel::deleteAiModel
+                )
+            }
 
             // Budget
             item { SettingsSectionLabel("Budget") }
@@ -522,6 +541,131 @@ fun SettingsItem(
 // Keep old function name for compatibility
 @Composable
 fun SettingsSection(title: String) = SettingsSectionLabel(title)
+
+@Composable
+private fun AiSettingsCard(
+    availability: AiAvailability,
+    aiEnabled: Boolean,
+    busy: Boolean,
+    onToggleEnabled: (Boolean) -> Unit,
+    onDownload: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val accent = MaterialTheme.colorScheme.tertiary
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.90f))
+            .padding(16.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp)) }
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Ledger AI Search", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text(aiStatusLine(availability), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (availability !is AiAvailability.Unsupported) {
+                    Switch(
+                        checked = aiEnabled,
+                        onCheckedChange = onToggleEnabled,
+                        enabled = !busy && availability is AiAvailability.Ready,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary,
+                            uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    )
+                }
+            }
+
+            when (val state = availability) {
+                is AiAvailability.Unsupported -> {
+                    Text(
+                        unsupportedMessage(state.reasons),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                AiAvailability.NeedsDownload -> {
+                    TextButton(
+                        onClick = onDownload,
+                        enabled = !busy,
+                        colors = ButtonDefaults.textButtonColors(contentColor = accent)
+                    ) { Text(if (busy) "Preparing..." else "Download model") }
+                }
+                is AiAvailability.Downloading -> {
+                    val pct = if (state.totalBytes > 0) (state.downloadedBytes * 100 / state.totalBytes) else 0
+                    Text(
+                        "Downloading... $pct% (${formatBytes(state.downloadedBytes)} / ${formatBytes(state.totalBytes)})",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                AiAvailability.Ready -> {
+                    TextButton(
+                        onClick = onDelete,
+                        enabled = !busy,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text(if (busy) "Working..." else "Remove model") }
+                }
+                AiAvailability.Initializing -> {
+                    Text("Checking device...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                is AiAvailability.Error -> {
+                    Text(state.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    TextButton(
+                        onClick = onDownload,
+                        enabled = !busy,
+                        colors = ButtonDefaults.textButtonColors(contentColor = accent)
+                    ) { Text("Retry") }
+                }
+            }
+        }
+    }
+}
+
+private fun aiStatusLine(availability: AiAvailability): String = when (availability) {
+    is AiAvailability.Unsupported -> "Not available on this device"
+    AiAvailability.NeedsDownload -> "Download required. Runs fully offline, nothing leaves your device."
+    is AiAvailability.Downloading -> "Downloading model..."
+    AiAvailability.Ready -> "Ready. Ask questions about your ledger in plain English."
+    AiAvailability.Initializing -> "Checking compatibility..."
+    is AiAvailability.Error -> "Something went wrong"
+}
+
+private fun unsupportedMessage(reasons: List<AiCompatibility.Reason>): String {
+    if (reasons.isEmpty()) return "Device not supported."
+    val phrases = reasons.map {
+        when (it) {
+            AiCompatibility.Reason.UNSUPPORTED_ABI -> "needs a 64-bit ARM device"
+            AiCompatibility.Reason.API_TOO_OLD -> "needs Android 12 or newer"
+            AiCompatibility.Reason.EMULATOR -> "emulators are not supported"
+            AiCompatibility.Reason.LOW_RAM_DEVICE -> "device is flagged as low-RAM"
+            AiCompatibility.Reason.INSUFFICIENT_RAM -> "needs at least 8 GB RAM"
+            AiCompatibility.Reason.INSUFFICIENT_STORAGE -> "needs at least 2 GB free storage"
+        }
+    }
+    return "On-device AI ${phrases.joinToString("; ")}."
+}
+
+private fun formatBytes(bytes: Long): String {
+    if (bytes <= 0) return "0 B"
+    val units = listOf("B", "KB", "MB", "GB")
+    var value = bytes.toDouble()
+    var unit = 0
+    while (value >= 1024 && unit < units.lastIndex) {
+        value /= 1024
+        unit += 1
+    }
+    return "%.1f %s".format(value, units[unit])
+}
 
 private fun isBatteryOptimizationIgnored(context: Context): Boolean {
     val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return true

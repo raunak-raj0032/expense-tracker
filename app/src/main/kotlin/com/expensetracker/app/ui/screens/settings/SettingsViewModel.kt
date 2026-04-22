@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.biometric.BiometricManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expensetracker.app.ai.AiAvailability
+import com.expensetracker.app.ai.OnDeviceAiManager
 import com.expensetracker.app.core.data.repository.AppDataRepository
 import com.expensetracker.app.core.prefs.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -20,6 +23,7 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val appDataRepository: AppDataRepository,
     private val userPreferences: UserPreferences,
+    private val onDeviceAiManager: OnDeviceAiManager,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -28,6 +32,48 @@ class SettingsViewModel @Inject constructor(
 
     val homeCurrency: StateFlow<String> = userPreferences.homeCurrency
         .stateIn(viewModelScope, SharingStarted.Eagerly, "INR")
+
+    val aiAvailability: StateFlow<AiAvailability> = onDeviceAiManager.observeAvailability()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, AiAvailability.Initializing)
+
+    val aiEnabled: StateFlow<Boolean> = userPreferences.aiModelState
+        .map { it.enabled }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    val aiDownloadedBytes: StateFlow<Long> = userPreferences.aiModelState
+        .map { it.downloadedBytes }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
+
+    private val _aiBusy = MutableStateFlow(false)
+    val aiBusy: StateFlow<Boolean> = _aiBusy.asStateFlow()
+
+    fun setAiEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferences.setAiEnabled(enabled)
+            _message.value = if (enabled) "On-device AI enabled." else "On-device AI disabled."
+        }
+    }
+
+    fun downloadAiModel() {
+        if (_aiBusy.value) return
+        _aiBusy.value = true
+        viewModelScope.launch {
+            onDeviceAiManager.downloadModel()
+                .onFailure { _message.value = it.message ?: "Model download failed." }
+                .onSuccess { _message.value = "Model download complete." }
+            _aiBusy.value = false
+        }
+    }
+
+    fun deleteAiModel() {
+        if (_aiBusy.value) return
+        _aiBusy.value = true
+        viewModelScope.launch {
+            onDeviceAiManager.deleteModel()
+            _message.value = "On-device model removed."
+            _aiBusy.value = false
+        }
+    }
 
     fun setHomeCurrency(code: String) {
         viewModelScope.launch {
