@@ -38,7 +38,14 @@ function Invoke-Adb {
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        return & $adb @Arguments 2>&1
+        $output = & $adb @Arguments 2>&1
+        return @($output | ForEach-Object {
+            if ($_ -is [System.Management.Automation.ErrorRecord]) {
+                $_.ToString()
+            } else {
+                "$_"
+            }
+        })
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference
     }
@@ -63,20 +70,44 @@ function Try-Connect {
     return (Test-WirelessDevice -Endpoint $Endpoint)
 }
 
+function Resolve-DebugApk {
+    param([string]$ProjectDir)
+
+    # AGP 8.x may write the APK to either of these locations depending on
+    # version and cached intermediates. Check both and pick the newest.
+    $candidates = @(
+        @(
+            (Join-Path $ProjectDir "app\build\outputs\apk\debug\app-debug.apk"),
+            (Join-Path $ProjectDir "app\build\intermediates\apk\debug\app-debug.apk")
+        ) |
+            Where-Object { Test-Path $_ -PathType Leaf } |
+            Sort-Object { (Get-Item $_).LastWriteTimeUtc } -Descending
+    )
+
+    if ($candidates.Count -eq 0) {
+        return $null
+    }
+    return $candidates[0]
+}
+
 function Install-DebugApk {
     param(
         [string]$Endpoint,
         [string]$ProjectDir
     )
 
-    $apkPath = Join-Path $ProjectDir "app\build\outputs\apk\debug\app-debug.apk"
-    if (-not (Test-Path $apkPath)) {
-        Write-Error "APK not found at $apkPath after build."
+    $apkPath = Resolve-DebugApk -ProjectDir $ProjectDir
+    if (-not $apkPath) {
+        Write-Error "APK not found under app\build\outputs\apk\debug or app\build\intermediates\apk\debug after build."
+        exit 1
+    }
+    if (-not (Test-Path $apkPath -PathType Leaf)) {
+        Write-Error "Resolved APK path is not a file: $apkPath"
         exit 1
     }
 
-    Write-Host "      Installing APK over adb to $Endpoint ..." -ForegroundColor Yellow
-    Invoke-Adb -s $Endpoint install --no-streaming -r $apkPath | Out-Host
+    Write-Host "      Installing APK ($apkPath) over adb to $Endpoint ..." -ForegroundColor Yellow
+    Invoke-Adb -s $Endpoint install --no-streaming -r -t $apkPath | Out-Host
     if ($LASTEXITCODE -ne 0) {
         Write-Error "adb install failed for $Endpoint."
         exit 1
