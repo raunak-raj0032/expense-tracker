@@ -123,14 +123,17 @@ class PaymentMessageParser @Inject constructor() {
         val reference = extractReference(combined)
         val rawParty = extractParty(combined)
         val rawPartyHint = rawParty?.let(::classifyMerchant)
-        val textHint = classifyMerchant(combined)
+        // Only scan the full screen text for known merchants when we couldn't
+        // extract an explicit party — otherwise ads/promos ("Ola", "power bill")
+        // on a GPay/PhonePe screen would override the real recipient.
+        val textHint = if (rawParty == null) classifyMerchant(combined) else null
         val fallbackSenderHint = sender
             ?.takeIf(::looksMeaningfulSender)
             ?.let(::classifyMerchant)
         val merchantName = rawPartyHint?.canonicalName
+            ?: rawParty
             ?: textHint?.canonicalName
             ?: fallbackSenderHint?.canonicalName
-            ?: rawParty
             ?: sender?.takeIf(::looksMeaningfulSender)
 
         val isPeerTransfer = (paymentMethod == "UPI" || paymentMethod == "Wallet") &&
@@ -262,11 +265,15 @@ class PaymentMessageParser @Inject constructor() {
     }
 
     private fun classifyMerchant(value: String): MerchantHint? {
-        val normalized = normalizeKey(value)
+        // Tokenise on non-alphanumeric so keywords like "power" only match a
+        // standalone word, not substrings inside "Powered by" or URL slugs.
+        val tokens = value.lowercase(Locale.ROOT)
+            .split(Regex("[^a-z0-9]+"))
+            .filter { it.isNotBlank() }
+            .toHashSet()
         val match = merchantKeywordToHint.entries.firstOrNull { (keyword, _) ->
-            normalized.contains(keyword)
+            keyword in tokens
         }?.value
-
         return match?.let { MerchantHint(canonicalName = it.canonicalName, category = it.category) }
     }
 
@@ -366,7 +373,12 @@ class PaymentMessageParser @Inject constructor() {
 
         val partyPatterns = listOf(
             Regex("(?i)paid to\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
+            Regex("(?i)payment to\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
             Regex("(?i)sent to\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
+            // PhonePe accessibility screens: "Banking name: SATYAM SAHIL"
+            Regex("(?i)banking name:?\\s+([A-Za-z][A-Za-z0-9 .&\\-']{1,49})"),
+            // UPI VPAs: "satyamsahil@oksbi" — use the handle as the party name
+            Regex("([A-Za-z][A-Za-z0-9._\\-]{2,40})@[a-z]{2,20}"),
             Regex("(?i)transferred to\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
             Regex("(?i)received from\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
             Regex("(?i)from\\s+([A-Za-z0-9@._&\\- ]{2,50})\\s+(?:via|through|using|on|for)"),
@@ -431,6 +443,7 @@ class PaymentMessageParser @Inject constructor() {
         )
 
         val upiPackages = setOf(
+            "com.google.android.apps.nbu.paisa.user",
             "com.google.android.apps.nbu.paisa.provider",
             "com.phonepe.app",
             "com.paytm.app",

@@ -43,6 +43,21 @@ interface CaptureEventDao {
     @Query("SELECT * FROM capture_events WHERE fingerprintHash = :hash LIMIT 1")
     suspend fun findDuplicate(hash: String): CaptureEventEntity?
 
+    @Query("""
+        SELECT * FROM capture_events
+        WHERE sourceAppPackage = :packageName
+        AND parsedAmountMinor = :amountMinor
+        AND parsedDirection = :direction
+        AND receivedAt >= :sinceMillis
+        LIMIT 1
+    """)
+    suspend fun findRecentMatch(
+        packageName: String?,
+        amountMinor: Long,
+        direction: String,
+        sinceMillis: Long
+    ): CaptureEventEntity?
+
     @Query("UPDATE capture_events SET linkedTransactionId = :transactionId, parseStatus = 'SUCCESS' WHERE id = :eventId")
     suspend fun linkTransaction(eventId: Long, transactionId: Long)
 

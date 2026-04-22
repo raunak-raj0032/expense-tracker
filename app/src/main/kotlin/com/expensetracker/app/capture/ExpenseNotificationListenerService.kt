@@ -20,6 +20,7 @@ class ExpenseNotificationListenerService : NotificationListenerService() {
 
     companion object {
         private val SUPPORTED_PACKAGES = setOf(
+            "com.google.android.apps.nbu.paisa.user",
             "com.google.android.apps.nbu.paisa.provider",
             "com.phonepe.app",
             "com.paytm.app",

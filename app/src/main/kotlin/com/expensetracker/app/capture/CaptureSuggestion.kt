@@ -18,3 +18,8 @@ data class CaptureSuggestion(
     val receivedAt: LocalDateTime,
     val isPeerTransfer: Boolean
 )
+
+data class AccessibilityCaptureOutcome(
+    val eventId: Long?,
+    val autoImported: Boolean
+)

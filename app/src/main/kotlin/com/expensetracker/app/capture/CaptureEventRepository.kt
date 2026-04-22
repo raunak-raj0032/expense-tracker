@@ -62,6 +62,45 @@ class CaptureEventRepository @Inject constructor(
             subtext = subtext,
             receivedAt = receivedAt,
             parseResult = parseResult
+        ).eventId > 0L
+    }
+
+    suspend fun captureAccessibility(
+        packageName: String,
+        text: String,
+        receivedAt: Long = System.currentTimeMillis()
+    ): AccessibilityCaptureOutcome {
+        val parseResult = parserRegistry.parse(
+            packageName = packageName,
+            title = "",
+            text = text,
+            subtext = ""
+        )
+        android.util.Log.d(
+            "UpiCapture",
+            "parsed pkg=$packageName isTxn=${parseResult.isTransaction} " +
+                "amount=${parseResult.amountMinor} dir=${parseResult.direction} " +
+                "merchant=${parseResult.merchant} conf=${parseResult.confidence} " +
+                "peer=${parseResult.isPeerTransfer}"
+        )
+        val result = storeCaptureEvent(
+            sourceKey = packageName,
+            sourceType = CaptureSourceType.ACCESSIBILITY,
+            title = null,
+            text = text,
+            subtext = null,
+            receivedAt = receivedAt,
+            parseResult = parseResult,
+            trustPeerTransfer = true,
+            bypassAutoCaptureGate = true
+        )
+        android.util.Log.d(
+            "UpiCapture",
+            "stored eventId=${result.eventId} autoImported=${result.autoImported}"
+        )
+        return AccessibilityCaptureOutcome(
+            eventId = result.eventId.takeIf { it > 0L },
+            autoImported = result.autoImported
         )
     }
 
@@ -79,7 +118,7 @@ class CaptureEventRepository @Inject constructor(
             subtext = null,
             receivedAt = receivedAt,
             parseResult = parseResult
-        )
+        ).eventId > 0L
     }
 
     suspend fun importRecentSms(limit: Int? = null): Int {
@@ -178,18 +217,39 @@ class CaptureEventRepository @Inject constructor(
         text: String,
         subtext: String?,
         receivedAt: Long,
-        parseResult: ParseResult
-    ): Boolean {
+        parseResult: ParseResult,
+        trustPeerTransfer: Boolean = false,
+        bypassAutoCaptureGate: Boolean = false
+    ): StoreOutcome {
         if (!parseResult.isTransaction || parseResult.fingerprint == null) {
-            return false
+            return StoreOutcome(0L, false)
         }
 
         if (captureEventDao.findDuplicate(parseResult.fingerprint) != null) {
-            return false
+            return StoreOutcome(0L, false)
         }
 
         if (transactionRepository.findByFingerprint(parseResult.fingerprint) != null) {
-            return false
+            return StoreOutcome(0L, false)
+        }
+
+        // Near-duplicate guard: same app + amount + direction within a short
+        // window often means the same payment surfaced twice (e.g. accessibility
+        // + notification, or two success-like screens with slightly different
+        // text). Fingerprint alone can't catch those because merchant/reference
+        // differ between captures.
+        val amount = parseResult.amountMinor
+        val direction = parseResult.direction?.name
+        if (amount != null && direction != null) {
+            val since = receivedAt - NEAR_DUPLICATE_WINDOW_MS
+            captureEventDao.findRecentMatch(sourceKey, amount, direction, since)?.let {
+                return StoreOutcome(0L, false)
+            }
+        }
+
+        val parseStatus = when {
+            parseResult.confidence >= 0.8f -> ParseStatus.SUCCESS.name
+            else -> ParseStatus.PENDING.name
         }
 
         val entity = CaptureEventEntity(
@@ -204,27 +264,26 @@ class CaptureEventRepository @Inject constructor(
             parsedMerchant = parseResult.merchant,
             parsedReference = parseResult.reference,
             confidenceScore = parseResult.confidence,
-            parseStatus = if (parseResult.confidence >= 0.8f) {
-                ParseStatus.SUCCESS.name
-            } else {
-                ParseStatus.PENDING.name
-            },
+            parseStatus = parseStatus,
             fingerprintHash = parseResult.fingerprint
         )
 
         val eventId = captureEventDao.insert(entity)
 
+        var autoImported = false
         if (eventId > 0L
             && entity.parseStatus == ParseStatus.SUCCESS.name
-            && !parseResult.isPeerTransfer
+            && (trustPeerTransfer || !parseResult.isPeerTransfer)
             && parseResult.confidence >= 0.8f
-            && userPreferences.autoCaptureEnabled.first()
+            && (bypassAutoCaptureGate || userPreferences.autoCaptureEnabled.first())
         ) {
-            runCatching { addToLedger(eventId) }
+            autoImported = runCatching { addToLedger(eventId) }.isSuccess
         }
 
-        return true
+        return StoreOutcome(eventId, autoImported)
     }
+
+    private data class StoreOutcome(val eventId: Long, val autoImported: Boolean)
 
     private fun toSuggestion(event: CaptureEventEntity): CaptureSuggestion? {
         val parseResult = parseEvent(event)
@@ -356,6 +415,10 @@ class CaptureEventRepository @Inject constructor(
     private fun sourceLabel(event: CaptureEventEntity): String {
         return when (event.sourceType) {
             CaptureSourceType.SMS.name -> "SMS ${event.sourceAppPackage?.let { "from $it" } ?: ""}".trim()
+            CaptureSourceType.ACCESSIBILITY.name -> {
+                val appName = notificationSourceNames[event.sourceAppPackage] ?: event.sourceAppPackage ?: "UPI app"
+                "$appName screen"
+            }
             else -> notificationSourceNames[event.sourceAppPackage] ?: event.sourceAppPackage ?: "Notification"
         }
     }
@@ -373,7 +436,10 @@ class CaptureEventRepository @Inject constructor(
     }
 
     private companion object {
+        const val NEAR_DUPLICATE_WINDOW_MS = 5 * 60 * 1000L
+
         val notificationSourceNames = mapOf(
+            "com.google.android.apps.nbu.paisa.user" to "Google Pay",
             "com.google.android.apps.nbu.paisa.provider" to "Google Pay",
             "com.phonepe.app" to "PhonePe",
             "com.paytm.app" to "Paytm",

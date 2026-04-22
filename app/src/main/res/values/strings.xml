@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Pocket Pulse</string>
+    <string name="upi_accessibility_service_description">Reads the success screen of UPI apps (PhonePe, Google Pay, Paytm, BHIM, Amazon Pay, CRED, MobiKwik, Freecharge, WhatsApp Pay) so Pocket Pulse can prompt you to confirm the payment. Nothing is sent off-device.</string>
 </resources>
