@@ -1,12 +1,10 @@
 package com.expensetracker.app.ui.screens.settings
 
-import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.PowerManager
 import android.provider.Settings as AndroidSettings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -41,6 +39,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Upload
@@ -73,7 +72,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.core.content.ContextCompat
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -109,14 +107,10 @@ fun SettingsScreen(
     val scope             = rememberCoroutineScope()
     val biometricEnabled by viewModel.biometricEnabled.collectAsStateWithLifecycle()
     val homeCurrency by viewModel.homeCurrency.collectAsStateWithLifecycle()
-    val autoCaptureEnabled by viewModel.autoCaptureEnabled.collectAsStateWithLifecycle()
     val resettingData by viewModel.resettingData.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var showAutoCaptureSheet by remember { mutableStateOf(false) }
-    val smsPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { /* result reflected on next composition via hasSmsAccess() */ }
+    var showBatteryOptSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { delay(60); visible = true }
 
@@ -205,21 +199,6 @@ fun SettingsScreen(
             // Automation
             item { SettingsSectionLabel("Automation") }
             item {
-                SettingsToggleItem(
-                    icon     = Icons.Default.Notifications,
-                    title    = "Auto-import UPI transactions",
-                    subtitle = "High-confidence payments from PhonePe, GPay & banks land in your ledger automatically. Peer transfers stay in review.",
-                    checked  = autoCaptureEnabled,
-                    accent   = MaterialTheme.colorScheme.tertiary,
-                    onCheckedChange = { enabled ->
-                        viewModel.setAutoCaptureEnabled(enabled)
-                        if (enabled && !(hasNotificationListenerAccess(context) && hasSmsAccess(context))) {
-                            showAutoCaptureSheet = true
-                        }
-                    }
-                )
-            }
-            item {
                 SettingsItem(
                     icon     = Icons.Default.Notifications,
                     title    = "SMS & Notification Capture",
@@ -228,6 +207,31 @@ fun SettingsScreen(
                     badge    = "Live",
                     modifier = Modifier.testTag("settings_capture_inbox"),
                     onClick  = onOpenCaptureInbox
+                )
+            }
+            item {
+                val accessibilityOn = hasAccessibilityAccess(context)
+                SettingsItem(
+                    icon     = Icons.Default.PhoneAndroid,
+                    title    = "UPI app capture",
+                    subtitle = "Detect payments on PhonePe, GPay, Paytm & more as you make them. You confirm each one.",
+                    accent   = MaterialTheme.colorScheme.tertiary,
+                    badge    = if (accessibilityOn) "On" else "Off",
+                    onClick  = {
+                        if (!accessibilityOn) {
+                            context.startActivity(
+                                Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        } else if (!isBatteryOptimizationIgnored(context)) {
+                            showBatteryOptSheet = true
+                        } else {
+                            context.startActivity(
+                                Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        }
+                    }
                 )
             }
             item { SettingsItem(Icons.AutoMirrored.Filled.Rule, "Rules",       "Automation rules",                  accent = MaterialTheme.colorScheme.tertiary) { showPrototypeMessage("Rules") } }
@@ -383,28 +387,36 @@ fun SettingsScreen(
         )
     }
 
-    if (showAutoCaptureSheet) {
+    if (showBatteryOptSheet) {
         AlertDialog(
-            onDismissRequest = { showAutoCaptureSheet = false },
-            title = { Text("Enable auto-import", fontWeight = FontWeight.ExtraBold) },
+            onDismissRequest = { showBatteryOptSheet = false },
+            title = { Text("Keep UPI capture alive", fontWeight = FontWeight.ExtraBold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("To pick up UPI transactions automatically we need two permissions. Everything stays on your device.")
-                    Text("• Notification access — reads payment alerts from PhonePe, GPay, Paytm, BHIM and bank apps.", style = MaterialTheme.typography.bodySmall)
-                    Text("• SMS access — reads bank UPI debit/credit messages so card and net-banking transactions get captured too.", style = MaterialTheme.typography.bodySmall)
+                    Text("Android aggressively kills background services to save battery. Exempt Pocket Pulse so UPI app capture keeps working when the app is closed.")
+                    Text("You'll be taken to the system prompt where you can allow background activity.", style = MaterialTheme.typography.bodySmall)
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    context.startActivity(Intent(AndroidSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                }) { Text("Grant notification access") }
+                    showBatteryOptSheet = false
+                    runCatching {
+                        @Suppress("BatteryLife")
+                        context.startActivity(
+                            Intent(AndroidSettings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                                .setData(Uri.parse("package:${context.packageName}"))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }.onFailure {
+                        context.startActivity(
+                            Intent(AndroidSettings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                }) { Text("Allow background activity") }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    smsPermissionLauncher.launch(
-                        arrayOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS)
-                    )
-                }) { Text("Grant SMS access") }
+                TextButton(onClick = { showBatteryOptSheet = false }) { Text("Not now") }
             }
         )
     }
@@ -511,16 +523,16 @@ fun SettingsItem(
 @Composable
 fun SettingsSection(title: String) = SettingsSectionLabel(title)
 
-private fun hasSmsAccess(context: Context): Boolean {
-    val read = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
-    val receive = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
-    return read && receive
+private fun isBatteryOptimizationIgnored(context: Context): Boolean {
+    val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return true
+    return pm.isIgnoringBatteryOptimizations(context.packageName)
 }
 
-private fun hasNotificationListenerAccess(context: Context): Boolean {
+private fun hasAccessibilityAccess(context: Context): Boolean {
     val enabled = AndroidSettings.Secure.getString(
         context.contentResolver,
-        "enabled_notification_listeners"
+        AndroidSettings.Secure.ENABLED_ACCESSIBILITY_SERVICES
     ).orEmpty()
-    return enabled.contains(context.packageName)
+    val expected = "${context.packageName}/com.expensetracker.app.capture.UpiAccessibilityService"
+    return enabled.split(':').any { it.equals(expected, ignoreCase = true) }
 }

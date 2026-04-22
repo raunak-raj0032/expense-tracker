@@ -29,20 +29,6 @@ class SettingsViewModel @Inject constructor(
     val homeCurrency: StateFlow<String> = userPreferences.homeCurrency
         .stateIn(viewModelScope, SharingStarted.Eagerly, "INR")
 
-    val autoCaptureEnabled: StateFlow<Boolean> = userPreferences.autoCaptureEnabled
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
-    fun setAutoCaptureEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            userPreferences.setAutoCaptureEnabled(enabled)
-            _message.value = if (enabled) {
-                "Auto-import enabled. High-confidence UPI payments will land in your ledger."
-            } else {
-                "Auto-import disabled. New captures will wait in the review inbox."
-            }
-        }
-    }
-
     fun setHomeCurrency(code: String) {
         viewModelScope.launch {
             userPreferences.setHomeCurrency(code)

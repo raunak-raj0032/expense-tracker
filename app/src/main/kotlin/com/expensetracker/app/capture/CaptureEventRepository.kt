@@ -14,10 +14,8 @@ import com.expensetracker.app.core.model.ParseStatus
 import com.expensetracker.app.core.model.Transaction
 import com.expensetracker.app.core.model.TransactionStatus
 import com.expensetracker.app.core.model.TransactionType
-import com.expensetracker.app.core.prefs.UserPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.time.Instant
 import java.time.LocalDateTime
@@ -34,8 +32,7 @@ class CaptureEventRepository @Inject constructor(
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
     private val merchantDao: MerchantDao,
-    private val parserRegistry: NotificationParserRegistry,
-    private val userPreferences: UserPreferences
+    private val parserRegistry: NotificationParserRegistry
 ) {
 
     fun observeReviewQueue(): Flow<List<CaptureSuggestion>> {
@@ -91,8 +88,7 @@ class CaptureEventRepository @Inject constructor(
             subtext = null,
             receivedAt = receivedAt,
             parseResult = parseResult,
-            trustPeerTransfer = true,
-            bypassAutoCaptureGate = true
+            trustPeerTransfer = true
         )
         android.util.Log.d(
             "UpiCapture",
@@ -218,8 +214,7 @@ class CaptureEventRepository @Inject constructor(
         subtext: String?,
         receivedAt: Long,
         parseResult: ParseResult,
-        trustPeerTransfer: Boolean = false,
-        bypassAutoCaptureGate: Boolean = false
+        trustPeerTransfer: Boolean = false
     ): StoreOutcome {
         if (!parseResult.isTransaction || parseResult.fingerprint == null) {
             return StoreOutcome(0L, false)
@@ -275,7 +270,6 @@ class CaptureEventRepository @Inject constructor(
             && entity.parseStatus == ParseStatus.SUCCESS.name
             && (trustPeerTransfer || !parseResult.isPeerTransfer)
             && parseResult.confidence >= 0.8f
-            && (bypassAutoCaptureGate || userPreferences.autoCaptureEnabled.first())
         ) {
             autoImported = runCatching { addToLedger(eventId) }.isSuccess
         }
