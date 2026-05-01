@@ -31,6 +31,9 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -116,6 +119,16 @@ fun AnalyticsScreen(
                     SummaryCard(uiState.totalExpense, uiState.totalIncome, uiState.totalIncome - uiState.totalExpense, uiState.previousExpense, uiState.previousIncome)
                 }
             }
+            item {
+                AnimatedVisibility(visible, enter = fadeIn(tween(450, 120))) {
+                    AiInsightCard(
+                        insight = uiState.aiInsight,
+                        error = uiState.aiInsightError,
+                        loading = uiState.aiInsightLoading,
+                        onGenerate = viewModel::generateAiInsights
+                    )
+                }
+            }
 
             item {
                 AnimatedVisibility(visible, enter = fadeIn(tween(400, 160))) {
@@ -172,6 +185,42 @@ fun AnalyticsScreen(
                 items(uiState.recurringSeries) { series ->
                     RecurringSeriesItem(series)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AiInsightCard(
+    insight: String?,
+    error: String?,
+    loading: Boolean,
+    onGenerate: () -> Unit
+) {
+    GlassPanel(modifier = Modifier.fillMaxWidth(), accent = MaterialTheme.colorScheme.tertiary) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionHeader(
+                eyebrow = "Llama Insights",
+                title = "AI read on your month",
+                subtitle = "Uses your configured laptop Ollama host"
+            )
+            when {
+                loading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Text("Asking llama3.2...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                error != null -> Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                insight != null -> Text(insight, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                else -> Text("Generate a short spending analysis from this month's totals, categories, merchants, and recurring charges.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Button(
+                onClick = onGenerate,
+                enabled = !loading,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+            ) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(if (insight == null) "Generate insights" else "Refresh insights")
             }
         }
     }

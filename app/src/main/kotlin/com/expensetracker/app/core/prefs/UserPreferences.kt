@@ -14,11 +14,12 @@ import javax.inject.Singleton
 
 data class AiModelState(
     val enabled: Boolean,
-    val version: String,
-    val path: String,
-    val downloadedBytes: Long,
-    val lastError: String
+    val lastError: String,
+    val endpoint: String,
+    val modelName: String
 )
+
+const val DEFAULT_AI_MODEL_NAME: String = "llama3.2:3b"
 
 private val Context.userPrefsDataStore by preferencesDataStore(name = "user_prefs")
 
@@ -31,23 +32,27 @@ class UserPreferences @Inject constructor(
     private val lastSyncKey = longPreferencesKey("last_sync_millis")
     private val homeCurrencyKey = stringPreferencesKey("home_currency")
     private val aiEnabledKey = booleanPreferencesKey("ai_enabled")
-    private val aiModelVersionKey = stringPreferencesKey("ai_model_version")
-    private val aiModelPathKey = stringPreferencesKey("ai_model_path")
-    private val aiModelDownloadedBytesKey = longPreferencesKey("ai_model_downloaded_bytes")
     private val aiLastErrorKey = stringPreferencesKey("ai_last_error")
+    private val aiEndpointKey = stringPreferencesKey("ai_endpoint")
+    private val aiModelNameKey = stringPreferencesKey("ai_model_name")
+    private val budgetNotifEnabledKey = booleanPreferencesKey("budget_notif_enabled")
+    private val budgetNotifPeriodKey = stringPreferencesKey("budget_notif_period")
+    private val budgetWidgetPeriodKey = stringPreferencesKey("budget_widget_period")
 
     val onboardingSeen: Flow<Boolean> = context.userPrefsDataStore.data.map { it[onboardingKey] ?: false }
     val biometricEnabled: Flow<Boolean> = context.userPrefsDataStore.data.map { it[biometricKey] ?: false }
     val lastSyncMillis: Flow<Long> = context.userPrefsDataStore.data.map { it[lastSyncKey] ?: 0L }
     val homeCurrency: Flow<String> = context.userPrefsDataStore.data.map { it[homeCurrencyKey] ?: "INR" }
+    val budgetNotifEnabled: Flow<Boolean> = context.userPrefsDataStore.data.map { it[budgetNotifEnabledKey] ?: false }
+    val budgetNotifPeriod: Flow<String> = context.userPrefsDataStore.data.map { it[budgetNotifPeriodKey] ?: "MONTHLY" }
+    val budgetWidgetPeriod: Flow<String> = context.userPrefsDataStore.data.map { it[budgetWidgetPeriodKey] ?: "MONTHLY" }
 
     val aiModelState: Flow<AiModelState> = context.userPrefsDataStore.data.map { prefs ->
         AiModelState(
             enabled = prefs[aiEnabledKey] ?: false,
-            version = prefs[aiModelVersionKey].orEmpty(),
-            path = prefs[aiModelPathKey].orEmpty(),
-            downloadedBytes = prefs[aiModelDownloadedBytesKey] ?: 0L,
-            lastError = prefs[aiLastErrorKey].orEmpty()
+            lastError = prefs[aiLastErrorKey].orEmpty(),
+            endpoint = prefs[aiEndpointKey].orEmpty(),
+            modelName = prefs[aiModelNameKey] ?: DEFAULT_AI_MODEL_NAME
         )
     }
 
@@ -77,25 +82,45 @@ class UserPreferences @Inject constructor(
         context.userPrefsDataStore.edit { it[aiEnabledKey] = enabled }
     }
 
-    suspend fun setAiModelInstalled(version: String, path: String, sizeBytes: Long) {
-        context.userPrefsDataStore.edit { prefs ->
-            prefs[aiModelVersionKey] = version
-            prefs[aiModelPathKey] = path
-            prefs[aiModelDownloadedBytesKey] = sizeBytes
-            prefs.remove(aiLastErrorKey)
-        }
-    }
-
     suspend fun setAiLastError(message: String) {
         context.userPrefsDataStore.edit { it[aiLastErrorKey] = message }
     }
 
+    suspend fun setAiEndpoint(endpoint: String) {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[aiEndpointKey] = endpoint.trim().trimEnd('/')
+            prefs.remove(aiLastErrorKey)
+        }
+    }
+
+    suspend fun setAiModelName(modelName: String) {
+        val cleaned = modelName.trim()
+        context.userPrefsDataStore.edit { prefs ->
+            if (cleaned.isEmpty()) {
+                prefs.remove(aiModelNameKey)
+            } else {
+                prefs[aiModelNameKey] = cleaned
+            }
+            prefs.remove(aiLastErrorKey)
+        }
+    }
+
+    suspend fun setBudgetNotifEnabled(enabled: Boolean) {
+        context.userPrefsDataStore.edit { it[budgetNotifEnabledKey] = enabled }
+    }
+
+    suspend fun setBudgetNotifPeriod(period: String) {
+        context.userPrefsDataStore.edit { it[budgetNotifPeriodKey] = period }
+    }
+
+    suspend fun setBudgetWidgetPeriod(period: String) {
+        context.userPrefsDataStore.edit { it[budgetWidgetPeriodKey] = period }
+    }
+
     suspend fun clearAiModelState() {
         context.userPrefsDataStore.edit { prefs ->
-            prefs.remove(aiModelVersionKey)
-            prefs.remove(aiModelPathKey)
-            prefs.remove(aiModelDownloadedBytesKey)
             prefs.remove(aiLastErrorKey)
+            prefs.remove(aiEndpointKey)
         }
     }
 }

@@ -45,8 +45,12 @@ class AuthViewModel @Inject constructor(
                 val wm = WorkManager.getInstance(appContext)
                 when (state) {
                     is AuthState.SignedIn -> {
-                        TransactionSyncWorker.enqueuePeriodic(wm)
-                        TransactionSyncWorker.enqueueOneShot(wm)
+                        if (state.user.cloudSyncEnabled) {
+                            TransactionSyncWorker.enqueuePeriodic(wm)
+                            TransactionSyncWorker.enqueueOneShot(wm)
+                        } else {
+                            TransactionSyncWorker.cancel(wm)
+                        }
                     }
                     AuthState.SignedOut -> TransactionSyncWorker.cancel(wm)
                     AuthState.Loading -> Unit

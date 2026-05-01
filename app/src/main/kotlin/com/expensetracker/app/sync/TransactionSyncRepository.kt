@@ -6,8 +6,7 @@ import com.expensetracker.app.core.model.CaptureSourceType
 import com.expensetracker.app.core.model.TransactionStatus
 import com.expensetracker.app.core.model.TransactionType
 import com.expensetracker.app.core.prefs.UserPreferences
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
+import com.expensetracker.app.di.FirebaseServices
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
@@ -19,17 +18,18 @@ import javax.inject.Singleton
 
 @Singleton
 class TransactionSyncRepository @Inject constructor(
-    private val firestore: FirebaseFirestore,
-    private val firebaseAuth: FirebaseAuth,
+    private val firebaseServices: FirebaseServices,
     private val transactionRepository: TransactionRepository,
     private val userPreferences: UserPreferences
 ) {
-    private fun userCollection() = firebaseAuth.currentUser?.uid?.let {
+    private fun userCollection() = firebaseServices.auth?.currentUser?.uid?.let {
+        val firestore = firebaseServices.firestore ?: return@let null
         firestore.collection("users").document(it).collection("transactions")
     }
 
     suspend fun pushAll(): SyncResult {
         val col = userCollection() ?: return SyncResult.NotSignedIn
+        val firestore = firebaseServices.firestore ?: return SyncResult.NotSignedIn
         return runCatching {
             val txns = transactionRepository.getForDateRange(LocalDate.of(1970, 1, 1), LocalDate.now().plusDays(1))
             val batch = firestore.batch()

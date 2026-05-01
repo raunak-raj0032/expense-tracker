@@ -33,7 +33,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
@@ -50,6 +52,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -108,6 +111,7 @@ fun LedgerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showFilterSheet by remember { mutableStateOf(false) }
+    var showBulkDeleteDialog by remember { mutableStateOf(false) }
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { delay(60); visible = true }
 
@@ -118,48 +122,71 @@ fun LedgerScreen(
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary))
-                            Text("History", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                        }
+            if (uiState.selectionMode) {
+                TopAppBar(
+                    title = {
                         Text(
-                            text  = if (onNavigateBack != null) "Full transaction record" else "Search, filter, and edit",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "${uiState.selectedTransactionIds.size} selected",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold
                         )
-                    }
-                },
-                navigationIcon = {
-                    onNavigateBack?.let { back ->
-                        IconButton(onClick = back) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onSurface)
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = viewModel::clearSelection) {
+                            Icon(Icons.Default.Close, "Cancel", tint = MaterialTheme.colorScheme.onSurface)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    actions = {
+                        IconButton(onClick = { showBulkDeleteDialog = true }) {
+                            Icon(Icons.Default.Delete, "Delete selected", tint = MaterialTheme.colorScheme.error)
                         }
                     }
-                },
-                colors  = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                actions = {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                    ) {
-                        IconButton(onClick = { showFilterSheet = true }) {
-                            BadgedBox(badge = {
-                                if (uiState.activeFilterCount > 0) {
-                                    Badge(containerColor = MaterialTheme.colorScheme.primary) {
-                                        Text(uiState.activeFilterCount.toString())
+                )
+            } else {
+                TopAppBar(
+                    title = {
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary))
+                                Text("History", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                            }
+                            Text(
+                                text  = if (onNavigateBack != null) "Full transaction record" else "Search, filter, and edit",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        onNavigateBack?.let { back ->
+                            IconButton(onClick = back) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    },
+                    colors  = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    actions = {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        ) {
+                            IconButton(onClick = { showFilterSheet = true }) {
+                                BadgedBox(badge = {
+                                    if (uiState.activeFilterCount > 0) {
+                                        Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                                            Text(uiState.activeFilterCount.toString())
+                                        }
                                     }
+                                }) {
+                                    Icon(Icons.Default.FilterList, "Filter", tint = MaterialTheme.colorScheme.primary)
                                 }
-                            }) {
-                                Icon(Icons.Default.FilterList, "Filter", tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
-                }
-            )
+                )
+            }
         }
     ) { padding ->
         LazyColumn(
@@ -228,11 +255,41 @@ fun LedgerScreen(
                         }
                     }
                     items(transactions) { transaction ->
-                        TransactionListItem(transaction = transaction, onClick = { onTransactionClick(transaction.id) })
+                        val isSelected = transaction.id in uiState.selectedTransactionIds
+                        TransactionListItem(
+                            transaction = transaction,
+                            onClick = {
+                                if (uiState.selectionMode) viewModel.toggleSelection(transaction.id)
+                                else onTransactionClick(transaction.id)
+                            },
+                            selected = isSelected,
+                            onLongClick = { viewModel.toggleSelection(transaction.id) }
+                        )
                     }
                 }
             }
         }
+    }
+
+    if (showBulkDeleteDialog) {
+        val count = uiState.selectedTransactionIds.size
+        AlertDialog(
+            onDismissRequest = { showBulkDeleteDialog = false },
+            title = { Text("Delete $count transaction${if (count == 1) "" else "s"}?", fontWeight = FontWeight.ExtraBold) },
+            text = { Text("This will remove the selected entries from your ledger. You can still recover them by restoring a backup.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteSelected()
+                        showBulkDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBulkDeleteDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 
     if (showFilterSheet) {

@@ -49,6 +49,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -80,6 +81,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.ai.AiAvailability
 import com.expensetracker.app.ai.AiCompatibility
+import com.expensetracker.app.budget.BudgetPeriod
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import com.expensetracker.app.core.money.CurrencyConverter
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.NeonPill
@@ -115,6 +119,10 @@ fun SettingsScreen(
     val aiAvailability by viewModel.aiAvailability.collectAsStateWithLifecycle()
     val aiEnabled by viewModel.aiEnabled.collectAsStateWithLifecycle()
     val aiBusy by viewModel.aiBusy.collectAsStateWithLifecycle()
+    val budgetNotifEnabled by viewModel.budgetNotifEnabled.collectAsStateWithLifecycle()
+    val budgetNotifPeriod by viewModel.budgetNotifPeriod.collectAsStateWithLifecycle()
+    val aiEndpoint by viewModel.aiEndpoint.collectAsStateWithLifecycle()
+    val aiModelName by viewModel.aiModelName.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showBatteryOptSheet by remember { mutableStateOf(false) }
 
@@ -249,9 +257,11 @@ fun SettingsScreen(
                 AiSettingsCard(
                     availability = aiAvailability,
                     aiEnabled = aiEnabled,
+                    endpoint = aiEndpoint,
+                    modelName = aiModelName,
                     busy = aiBusy,
                     onToggleEnabled = viewModel::setAiEnabled,
-                    onDownload = viewModel::downloadAiModel,
+                    onSaveAndTest = viewModel::saveAndTestAiHost,
                     onDelete = viewModel::deleteAiModel
                 )
             }
@@ -259,6 +269,55 @@ fun SettingsScreen(
             // Budget
             item { SettingsSectionLabel("Budget") }
             item { SettingsItem(Icons.Default.Savings, "Budget", "Set monthly budgets", accent = MaterialTheme.colorScheme.primary, onClick = onOpenBudget) }
+            item {
+                SettingsToggleItem(
+                    icon = Icons.Default.Notifications,
+                    title = "Pin budget to notifications",
+                    subtitle = "Persistent notification with ${budgetNotifPeriod.label.lowercase()} progress, visible on lock screen",
+                    checked = budgetNotifEnabled,
+                    accent = MaterialTheme.colorScheme.primary,
+                    onCheckedChange = viewModel::setBudgetNotifEnabled
+                )
+            }
+            if (budgetNotifEnabled) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.large)
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.90f))
+                            .padding(16.dp)
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                "Notification view",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                letterSpacing = 1.0.sp
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                BudgetPeriod.entries.forEach { period ->
+                                    val selected = budgetNotifPeriod == period
+                                    FilterChip(
+                                        selected = selected,
+                                        onClick = { viewModel.setBudgetNotifPeriod(period) },
+                                        label = { Text(period.label) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                                            selectedLabelColor = MaterialTheme.colorScheme.primary
+                                        )
+                                    )
+                                }
+                            }
+                            Text(
+                                "Tap the action button on the notification to cycle the view as well.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
 
             // Data Management
             item { SettingsSectionLabel("Data Management") }
@@ -546,12 +605,18 @@ fun SettingsSection(title: String) = SettingsSectionLabel(title)
 private fun AiSettingsCard(
     availability: AiAvailability,
     aiEnabled: Boolean,
+    endpoint: String,
+    modelName: String,
     busy: Boolean,
     onToggleEnabled: (Boolean) -> Unit,
-    onDownload: () -> Unit,
+    onSaveAndTest: (String, String) -> Unit,
     onDelete: () -> Unit
 ) {
     val accent = MaterialTheme.colorScheme.tertiary
+    var editingEndpoint by remember(endpoint) { mutableStateOf(endpoint) }
+    var editingModel by remember(modelName) { mutableStateOf(modelName) }
+    val dirty = editingEndpoint.trim() != endpoint || editingModel.trim() != modelName
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -567,7 +632,7 @@ private fun AiSettingsCard(
                 ) { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp)) }
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Ledger AI Search", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text("Llama AI Insights", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     Text(aiStatusLine(availability), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (availability !is AiAvailability.Unsupported) {
@@ -585,6 +650,50 @@ private fun AiSettingsCard(
                 }
             }
 
+            OutlinedTextField(
+                value = editingEndpoint,
+                onValueChange = { editingEndpoint = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Ollama host URL") },
+                supportingText = {
+                    Text("LAN: http://<laptop-ip>:11434  ·  Tunnel: https://*.trycloudflare.com")
+                }
+            )
+
+            OutlinedTextField(
+                value = editingModel,
+                onValueChange = { editingModel = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Model name") },
+                supportingText = {
+                    Text("Must be pulled on the host, e.g. llama3.2:3b or llama3.2:1b for faster replies")
+                }
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    onClick = { onSaveAndTest(editingEndpoint, editingModel) },
+                    enabled = !busy && editingEndpoint.isNotBlank() && editingModel.isNotBlank(),
+                    colors = ButtonDefaults.textButtonColors(contentColor = accent)
+                ) {
+                    val label = when {
+                        busy -> "Testing..."
+                        dirty -> "Save & test"
+                        else -> "Re-test host"
+                    }
+                    Text(label)
+                }
+                if (availability is AiAvailability.Ready || availability is AiAvailability.Error) {
+                    TextButton(
+                        onClick = onDelete,
+                        enabled = !busy,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Forget host") }
+                }
+            }
+
             when (val state = availability) {
                 is AiAvailability.Unsupported -> {
                     Text(
@@ -594,11 +703,11 @@ private fun AiSettingsCard(
                     )
                 }
                 AiAvailability.NeedsDownload -> {
-                    TextButton(
-                        onClick = onDownload,
-                        enabled = !busy,
-                        colors = ButtonDefaults.textButtonColors(contentColor = accent)
-                    ) { Text(if (busy) "Preparing..." else "Download model") }
+                    Text(
+                        "Enter your Ollama host URL and tap Save & test.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 is AiAvailability.Downloading -> {
                     val pct = if (state.totalBytes > 0) (state.downloadedBytes * 100 / state.totalBytes) else 0
@@ -608,23 +717,12 @@ private fun AiSettingsCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                AiAvailability.Ready -> {
-                    TextButton(
-                        onClick = onDelete,
-                        enabled = !busy,
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    ) { Text(if (busy) "Working..." else "Remove model") }
-                }
+                AiAvailability.Ready -> Unit
                 AiAvailability.Initializing -> {
                     Text("Checking device...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 is AiAvailability.Error -> {
                     Text(state.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                    TextButton(
-                        onClick = onDownload,
-                        enabled = !busy,
-                        colors = ButtonDefaults.textButtonColors(contentColor = accent)
-                    ) { Text("Retry") }
                 }
             }
         }
@@ -633,9 +731,9 @@ private fun AiSettingsCard(
 
 private fun aiStatusLine(availability: AiAvailability): String = when (availability) {
     is AiAvailability.Unsupported -> "Not available on this device"
-    AiAvailability.NeedsDownload -> "Download required. Runs fully offline, nothing leaves your device."
+    AiAvailability.NeedsDownload -> "Configure the laptop Ollama host."
     is AiAvailability.Downloading -> "Downloading model..."
-    AiAvailability.Ready -> "Ready. Ask questions about your ledger in plain English."
+    AiAvailability.Ready -> "Ready. Phones can request insights from your laptop."
     AiAvailability.Initializing -> "Checking compatibility..."
     is AiAvailability.Error -> "Something went wrong"
 }

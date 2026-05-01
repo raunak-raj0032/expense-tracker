@@ -1,7 +1,7 @@
 package com.expensetracker.app.di
 
 import com.expensetracker.app.ai.OnDeviceAiManager
-import com.expensetracker.app.ai.StubOnDeviceAiManager
+import com.expensetracker.app.ai.OllamaAiManager
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -13,5 +13,5 @@ import javax.inject.Singleton
 abstract class AiModule {
     @Binds
     @Singleton
-    abstract fun bindOnDeviceAiManager(impl: StubOnDeviceAiManager): OnDeviceAiManager
+    abstract fun bindOnDeviceAiManager(impl: OllamaAiManager): OnDeviceAiManager
 }

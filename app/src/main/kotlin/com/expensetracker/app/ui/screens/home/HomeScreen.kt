@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -72,6 +73,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.expensetracker.app.auth.AuthState
@@ -110,11 +115,34 @@ fun HomeScreen(
     val authState by authViewModel.authState.collectAsStateWithLifecycle()
     val firstName = (authState as? AuthState.SignedIn)?.user?.firstName.orEmpty()
     var visible by remember { mutableStateOf(false) }
+    var showBulkDeleteDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { delay(80); visible = true }
 
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
+            if (uiState.selectionMode) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = "${uiState.selectedTransactionIds.size} selected",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = viewModel::clearSelection) {
+                            Icon(Icons.Default.Close, "Cancel", tint = MaterialTheme.colorScheme.onSurface)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    actions = {
+                        IconButton(onClick = { showBulkDeleteDialog = true }) {
+                            Icon(Icons.Default.Delete, "Delete selected", tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                )
+            } else {
             TopAppBar(
                 title = {
                     Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
@@ -163,6 +191,7 @@ fun HomeScreen(
                     }
                 }
             )
+            }
         },
         floatingActionButton = {
             FloatingActionButton(
@@ -291,14 +320,41 @@ fun HomeScreen(
                                       animationSpec  = tween(400, delayMillis = 160 + index * 40, easing = FastOutSlowInEasing)
                                   )
                     ) {
+                        val isSelected = transaction.id in uiState.selectedTransactionIds
                         TransactionListItem(
                             transaction = transaction,
-                            onClick     = { onTransactionClick(transaction.id) }
+                            onClick = {
+                                if (uiState.selectionMode) viewModel.toggleSelection(transaction.id)
+                                else onTransactionClick(transaction.id)
+                            },
+                            selected = isSelected,
+                            onLongClick = { viewModel.toggleSelection(transaction.id) }
                         )
                     }
                 }
             }
         }
+    }
+
+    if (showBulkDeleteDialog) {
+        val count = uiState.selectedTransactionIds.size
+        AlertDialog(
+            onDismissRequest = { showBulkDeleteDialog = false },
+            title = { Text("Delete $count transaction${if (count == 1) "" else "s"}?", fontWeight = FontWeight.ExtraBold) },
+            text = { Text("Selected entries will be removed from your ledger.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteSelected()
+                        showBulkDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBulkDeleteDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 
@@ -790,10 +846,13 @@ private fun HomeActionCard(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun TransactionListItem(
     transaction: Transaction,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    selected: Boolean = false,
+    onLongClick: (() -> Unit)? = null
 ) {
     val isIncome  = transaction.type.name == "INCOME"
     val accent    = if (isIncome) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary
@@ -808,12 +867,20 @@ fun TransactionListItem(
         transaction.paymentMethod?.takeIf { it.isNotBlank() }?.let { append(" · $it") }
     }
 
+    val containerColor = if (selected)
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+    else
+        MaterialTheme.colorScheme.surface.copy(alpha = 0.90f)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.large)
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.90f))
-            .clickable(onClick = onClick)
+            .background(containerColor)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
     ) {
         // Left accent stripe
         Box(

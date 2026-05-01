@@ -17,7 +17,7 @@ Phase 1 wires up Firebase Authentication with Google Sign-In. Firebase's Spark p
    Copy the `SHA1` line under `Variant: debug`. Paste it into the Firebase form.
    (You can add more SHAs later for release builds via Project Settings -> Your apps.)
    Current local debug SHA-1 for this workspace:
-   `2D:B0:02:C8:C0:89:EB:23:06:F2:31:E7:E7:E2:E6:77:92:90:B8:EB`
+   `69:4A:68:C1:05:8F:7B:13:55:45:CF:F2:33:59:0D:E1:FB:C6:03:DB`
 5. Click **Register app**.
 
 ## 3. Drop `google-services.json` into the project

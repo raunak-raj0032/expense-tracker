@@ -6,7 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expensetracker.app.ai.AiAvailability
 import com.expensetracker.app.ai.OnDeviceAiManager
+import com.expensetracker.app.budget.BudgetNotificationService
+import com.expensetracker.app.budget.BudgetPeriod
 import com.expensetracker.app.core.data.repository.AppDataRepository
+import com.expensetracker.app.core.prefs.DEFAULT_AI_MODEL_NAME
 import com.expensetracker.app.core.prefs.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -33,6 +36,32 @@ class SettingsViewModel @Inject constructor(
     val homeCurrency: StateFlow<String> = userPreferences.homeCurrency
         .stateIn(viewModelScope, SharingStarted.Eagerly, "INR")
 
+    val budgetNotifEnabled: StateFlow<Boolean> = userPreferences.budgetNotifEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    val budgetNotifPeriod: StateFlow<BudgetPeriod> = userPreferences.budgetNotifPeriod
+        .map { BudgetPeriod.fromName(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, BudgetPeriod.MONTHLY)
+
+    fun setBudgetNotifEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferences.setBudgetNotifEnabled(enabled)
+            if (enabled) {
+                BudgetNotificationService.start(appContext)
+                _message.value = "Budget tracker pinned to your notifications."
+            } else {
+                BudgetNotificationService.stop(appContext)
+                _message.value = "Budget tracker notification stopped."
+            }
+        }
+    }
+
+    fun setBudgetNotifPeriod(period: BudgetPeriod) {
+        viewModelScope.launch {
+            userPreferences.setBudgetNotifPeriod(period.name)
+        }
+    }
+
     val aiAvailability: StateFlow<AiAvailability> = onDeviceAiManager.observeAvailability()
         .stateIn(viewModelScope, SharingStarted.Eagerly, AiAvailability.Initializing)
 
@@ -40,9 +69,13 @@ class SettingsViewModel @Inject constructor(
         .map { it.enabled }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    val aiDownloadedBytes: StateFlow<Long> = userPreferences.aiModelState
-        .map { it.downloadedBytes }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
+    val aiEndpoint: StateFlow<String> = userPreferences.aiModelState
+        .map { it.endpoint }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
+    val aiModelName: StateFlow<String> = userPreferences.aiModelState
+        .map { it.modelName }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_AI_MODEL_NAME)
 
     private val _aiBusy = MutableStateFlow(false)
     val aiBusy: StateFlow<Boolean> = _aiBusy.asStateFlow()
@@ -50,17 +83,19 @@ class SettingsViewModel @Inject constructor(
     fun setAiEnabled(enabled: Boolean) {
         viewModelScope.launch {
             userPreferences.setAiEnabled(enabled)
-            _message.value = if (enabled) "On-device AI enabled." else "On-device AI disabled."
+            _message.value = if (enabled) "AI insights enabled." else "AI insights disabled."
         }
     }
 
-    fun downloadAiModel() {
+    fun saveAndTestAiHost(endpoint: String, modelName: String) {
         if (_aiBusy.value) return
         _aiBusy.value = true
         viewModelScope.launch {
-            onDeviceAiManager.downloadModel()
-                .onFailure { _message.value = it.message ?: "Model download failed." }
-                .onSuccess { _message.value = "Model download complete." }
+            userPreferences.setAiModelName(modelName)
+            userPreferences.setAiEndpoint(endpoint)
+            onDeviceAiManager.initializeIfNeeded()
+                .onSuccess { _message.value = "Ollama host reachable. AI is ready." }
+                .onFailure { _message.value = it.message ?: "Could not reach Ollama host." }
             _aiBusy.value = false
         }
     }

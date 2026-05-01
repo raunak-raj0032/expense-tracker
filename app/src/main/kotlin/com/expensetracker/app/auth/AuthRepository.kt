@@ -6,40 +6,53 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
 import com.expensetracker.app.R
+import com.expensetracker.app.di.FirebaseServices
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.tasks.await
 import java.security.SecureRandom
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
 
 @Singleton
 class AuthRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseServices: FirebaseServices
 ) {
     private val credentialManager = CredentialManager.create(context)
+    private val localPrefs = context.getSharedPreferences("local_auth", Context.MODE_PRIVATE)
+    private val localAuthState = MutableStateFlow(loadLocalAuthState())
 
-    val authState: Flow<AuthState> = callbackFlow {
+    val authState: Flow<AuthState> = firebaseServices.auth?.let { auth ->
+        firebaseAuthState(auth)
+    } ?: localAuthState.asStateFlow()
+
+    private fun firebaseAuthState(firebaseAuth: FirebaseAuth): Flow<AuthState> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener { auth ->
             val user = auth.currentUser
             trySend(
-                if (user == null) AuthState.SignedOut
-                else AuthState.SignedIn(
-                    AuthUser(
-                        uid = user.uid,
-                        displayName = user.displayName,
-                        email = user.email,
-                        photoUrl = user.photoUrl?.toString(),
-                        isAnonymous = user.isAnonymous
+                if (user == null) {
+                    AuthState.SignedOut
+                } else {
+                    AuthState.SignedIn(
+                        AuthUser(
+                            uid = user.uid,
+                            displayName = user.displayName,
+                            email = user.email,
+                            photoUrl = user.photoUrl?.toString(),
+                            isAnonymous = user.isAnonymous,
+                            cloudSyncEnabled = true
+                        )
                     )
-                )
+                }
             )
         }
         firebaseAuth.addAuthStateListener(listener)
@@ -47,13 +60,14 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun signInWithGoogle(activityContext: Context) {
+        val firebaseAuth = firebaseServices.auth ?: throw firebaseNotConfigured()
         val webClientId = context.getString(R.string.default_web_client_id)
-        val nonce = generateNonce()
+        if (webClientId.isBlank()) throw firebaseNotConfigured()
 
         val googleIdOption = GetGoogleIdOption.Builder()
             .setFilterByAuthorizedAccounts(false)
             .setServerClientId(webClientId)
-            .setNonce(nonce)
+            .setNonce(generateNonce())
             .setAutoSelectEnabled(false)
             .build()
 
@@ -77,6 +91,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun signInWithEmail(email: String, password: String) {
+        val firebaseAuth = firebaseServices.auth ?: throw firebaseNotConfigured()
         val e = email.trim()
         if (e.isEmpty() || password.isEmpty()) {
             throw AuthException("Enter your email and password")
@@ -89,6 +104,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun signUpWithEmail(email: String, password: String, displayName: String?) {
+        val firebaseAuth = firebaseServices.auth ?: throw firebaseNotConfigured()
         val e = email.trim()
         if (e.isEmpty() || password.isEmpty()) {
             throw AuthException("Enter your email and password")
@@ -112,6 +128,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun sendPasswordReset(email: String) {
+        val firebaseAuth = firebaseServices.auth ?: throw firebaseNotConfigured()
         val e = email.trim()
         if (e.isEmpty()) throw AuthException("Enter your email first")
         try {
@@ -122,6 +139,13 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun signInAnonymously() {
+        val firebaseAuth = firebaseServices.auth
+        if (firebaseAuth == null) {
+            localPrefs.edit().putBoolean(KEY_LOCAL_GUEST_SIGNED_IN, true).apply()
+            localAuthState.value = localGuestState()
+            return
+        }
+
         try {
             firebaseAuth.signInAnonymously().await()
         } catch (t: Throwable) {
@@ -130,7 +154,9 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun signOut() {
-        firebaseAuth.signOut()
+        firebaseServices.auth?.signOut()
+        localPrefs.edit().putBoolean(KEY_LOCAL_GUEST_SIGNED_IN, false).apply()
+        localAuthState.value = AuthState.SignedOut
         runCatching {
             credentialManager.clearCredentialState(ClearCredentialStateRequest())
         }
@@ -153,16 +179,43 @@ class AuthRepository @Inject constructor(
                 raw.contains("invalid-email", ignoreCase = true) ->
                 "That email address doesn't look right"
             raw.contains("network", ignoreCase = true) ->
-                "Network error — check your connection"
+                "Network error - check your connection"
             raw.isBlank() -> "Something went wrong, please try again"
             else -> raw
         }
     }
 
+    private fun loadLocalAuthState(): AuthState =
+        if (localPrefs.getBoolean(KEY_LOCAL_GUEST_SIGNED_IN, false)) {
+            localGuestState()
+        } else {
+            AuthState.SignedOut
+        }
+
+    private fun localGuestState(): AuthState.SignedIn =
+        AuthState.SignedIn(
+            AuthUser(
+                uid = LOCAL_GUEST_UID,
+                displayName = "Guest",
+                email = null,
+                photoUrl = null,
+                isAnonymous = true,
+                cloudSyncEnabled = false
+            )
+        )
+
+    private fun firebaseNotConfigured(): AuthException =
+        AuthException("Firebase is not configured. Add app/google-services.json or continue as guest.")
+
     private fun generateNonce(): String {
         val bytes = ByteArray(16)
         SecureRandom().nextBytes(bytes)
         return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    private companion object {
+        const val KEY_LOCAL_GUEST_SIGNED_IN = "local_guest_signed_in"
+        const val LOCAL_GUEST_UID = "local-guest"
     }
 }
 

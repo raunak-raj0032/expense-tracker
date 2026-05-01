@@ -42,8 +42,10 @@ data class LedgerUiState(
     val accounts: List<Account> = emptyList(),
     val categories: List<Category> = emptyList(),
     val tags: List<Tag> = emptyList(),
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val selectedTransactionIds: Set<Long> = emptySet()
 ) {
+    val selectionMode: Boolean get() = selectedTransactionIds.isNotEmpty()
     val activeFilterCount: Int
         get() = listOf(
             selectedTypes.isNotEmpty(),
@@ -218,6 +220,30 @@ class LedgerViewModel @Inject constructor(
     fun deleteTransaction(id: Long) {
         viewModelScope.launch {
             transactionRepository.delete(id)
+            loadTransactions()
+        }
+    }
+
+    fun toggleSelection(id: Long) {
+        _uiState.update {
+            val updated = if (id in it.selectedTransactionIds)
+                it.selectedTransactionIds - id
+            else
+                it.selectedTransactionIds + id
+            it.copy(selectedTransactionIds = updated)
+        }
+    }
+
+    fun clearSelection() {
+        _uiState.update { it.copy(selectedTransactionIds = emptySet()) }
+    }
+
+    fun deleteSelected() {
+        val ids = _uiState.value.selectedTransactionIds
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            transactionRepository.deleteAll(ids)
+            _uiState.update { it.copy(selectedTransactionIds = emptySet()) }
             loadTransactions()
         }
     }

@@ -265,6 +265,10 @@ class PaymentMessageParser @Inject constructor() {
     }
 
     private fun classifyMerchant(value: String): MerchantHint? {
+        merchantKeywordToHint[normalizeKey(value)]?.let {
+            return MerchantHint(canonicalName = it.canonicalName, category = it.category)
+        }
+
         // Tokenise on non-alphanumeric so keywords like "power" only match a
         // standalone word, not substrings inside "Powered by" or URL slugs.
         val tokens = value.lowercase(Locale.ROOT)

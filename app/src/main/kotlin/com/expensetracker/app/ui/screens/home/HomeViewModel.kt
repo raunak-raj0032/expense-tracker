@@ -36,8 +36,11 @@ data class HomeUiState(
     val daysInMonth: Int = 30,
     val netFlow: Long = 0,
     val openCaptureCount: Int = 0,
-    val isLoading: Boolean = false
-)
+    val isLoading: Boolean = false,
+    val selectedTransactionIds: Set<Long> = emptySet()
+) {
+    val selectionMode: Boolean get() = selectedTransactionIds.isNotEmpty()
+}
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -121,6 +124,29 @@ class HomeViewModel @Inject constructor(
                     )
                 }
             }.collect { }
+        }
+    }
+
+    fun toggleSelection(id: Long) {
+        _uiState.update {
+            val updated = if (id in it.selectedTransactionIds)
+                it.selectedTransactionIds - id
+            else
+                it.selectedTransactionIds + id
+            it.copy(selectedTransactionIds = updated)
+        }
+    }
+
+    fun clearSelection() {
+        _uiState.update { it.copy(selectedTransactionIds = emptySet()) }
+    }
+
+    fun deleteSelected() {
+        val ids = _uiState.value.selectedTransactionIds
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            transactionRepository.deleteAll(ids)
+            _uiState.update { it.copy(selectedTransactionIds = emptySet()) }
         }
     }
 

@@ -25,7 +25,7 @@ class StubOnDeviceAiManager @Inject constructor(
                 is AiCompatibility.Result.Unsupported -> AiAvailability.Unsupported(compat.reasons)
                 AiCompatibility.Result.Supported -> when {
                     state.lastError.isNotEmpty() -> AiAvailability.Error(state.lastError)
-                    state.version.isEmpty() -> AiAvailability.NeedsDownload
+                    state.endpoint.isEmpty() -> AiAvailability.NeedsDownload
                     else -> AiAvailability.Ready
                 }
             }

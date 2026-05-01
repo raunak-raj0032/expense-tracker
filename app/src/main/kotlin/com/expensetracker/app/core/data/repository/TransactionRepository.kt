@@ -79,6 +79,11 @@ class TransactionRepository @Inject constructor(
 
     suspend fun delete(id: Long) = transactionDao.softDelete(id)
 
+    suspend fun deleteAll(ids: Collection<Long>) {
+        if (ids.isEmpty()) return
+        transactionDao.softDeleteAll(ids.toList())
+    }
+
     suspend fun getById(id: Long): Transaction? = transactionDao.getById(id)?.toDomain()
 
     suspend fun findByFingerprint(hash: String): Transaction? =

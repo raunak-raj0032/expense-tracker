@@ -15,6 +15,9 @@ interface TransactionDao {
     @Query("UPDATE transactions SET deletedAt = :deletedAt WHERE id = :id")
     suspend fun softDelete(id: Long, deletedAt: Long = System.currentTimeMillis())
 
+    @Query("UPDATE transactions SET deletedAt = :deletedAt WHERE id IN (:ids)")
+    suspend fun softDeleteAll(ids: List<Long>, deletedAt: Long = System.currentTimeMillis())
+
     @Query("SELECT * FROM transactions WHERE id = :id")
     suspend fun getById(id: Long): TransactionEntity?
 
