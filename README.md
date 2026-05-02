@@ -42,7 +42,7 @@ java -version
 gradlew.bat assembleDebug
 ```
 
-Google Sign-In requires Firebase project setup first. See [FIREBASE_SETUP.md](FIREBASE_SETUP.md) and place `google-services.json` at `app/google-services.json` before building.
+The app is local-only. No Firebase or cloud account setup is required.
 
 ## Setup Requirements
 
@@ -100,7 +100,7 @@ app/
 
 ## Privacy
 
-All financial data is stored locally on-device. The app does not transmit personal financial data to external servers.
+Financial data is stored locally on-device and is not synced to Firebase or any cloud account. Optional AI insights use the Ollama server you configure.
 
 ## License
 

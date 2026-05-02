@@ -170,6 +170,9 @@ class BudgetNotificationService : Service() {
                 addAction(0, nextLabel, cyclePi)
             }
             .build()
+            .apply {
+                flags = flags or Notification.FLAG_NO_CLEAR or Notification.FLAG_ONGOING_EVENT
+            }
     }
 
     private fun formatRupees(minor: Long): String {

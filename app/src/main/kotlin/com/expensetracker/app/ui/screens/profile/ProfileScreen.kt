@@ -17,12 +17,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,8 +50,6 @@ import com.expensetracker.app.auth.AuthViewModel
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionSpacing
-import java.text.DateFormat
-import java.util.Date
 
 @Composable
 fun ProfileScreen(
@@ -62,12 +59,8 @@ fun ProfileScreen(
 ) {
     val authState by authViewModel.authState.collectAsStateWithLifecycle()
     val biometric by viewModel.biometricEnabled.collectAsStateWithLifecycle()
-    val lastSync by viewModel.lastSyncMillis.collectAsStateWithLifecycle()
-    val syncing by viewModel.syncing.collectAsStateWithLifecycle()
-    val syncMsg by viewModel.syncMessage.collectAsStateWithLifecycle()
 
     var confirmSignOut by remember { mutableStateOf(false) }
-
     val user = (authState as? AuthState.SignedIn)?.user
 
     Scaffold(
@@ -121,12 +114,12 @@ fun ProfileScreen(
                     }
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text = user?.displayName ?: "Guest",
+                            text = user?.displayName ?: "Local profile",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = user?.email ?: "Not signed in",
+                            text = "On-device data only",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -135,41 +128,16 @@ fun ProfileScreen(
             }
 
             GlassPanel {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.CloudSync, null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.size(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Cloud backup", fontWeight = FontWeight.SemiBold)
-                            Text(
-                                text = if (lastSync == 0L) "Never synced"
-                                else "Last sync: ${DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(lastSync))}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    Button(
-                        onClick = { viewModel.syncNow() },
-                        enabled = !syncing && user != null,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        if (syncing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                            Spacer(Modifier.size(10.dp))
-                            Text("Syncing…")
-                        } else Text("Sync now")
-                    }
-                    syncMsg?.let {
+                    Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.size(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Local-only storage", fontWeight = FontWeight.SemiBold)
                         Text(
-                            it,
+                            "Financial records are saved in this app's Room database and are not synced to a cloud account.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -213,7 +181,7 @@ fun ProfileScreen(
         AlertDialog(
             onDismissRequest = { confirmSignOut = false },
             title = { Text("Sign out?") },
-            text = { Text("Your local data stays on this device. Cloud backup will stop until you sign in again.") },
+            text = { Text("Your local data stays on this device. Signing out only locks this local profile.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmSignOut = false

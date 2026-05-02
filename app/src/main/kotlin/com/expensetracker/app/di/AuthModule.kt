@@ -3,20 +3,18 @@ package com.expensetracker.app.di
 import android.content.Context
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import dagger.Module
 import dagger.Provides
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-data class FirebaseServices(
-    val auth: FirebaseAuth?,
-    val firestore: FirebaseFirestore?
+data class FirebaseAuthService(
+    val auth: FirebaseAuth?
 ) {
     val isConfigured: Boolean
-        get() = auth != null && firestore != null
+        get() = auth != null
 }
 
 @Module
@@ -24,16 +22,15 @@ data class FirebaseServices(
 object AuthModule {
     @Provides
     @Singleton
-    fun provideFirebaseServices(
+    fun provideFirebaseAuthService(
         @ApplicationContext context: Context
-    ): FirebaseServices {
+    ): FirebaseAuthService {
         val app = FirebaseApp.getApps(context).firstOrNull()
             ?: runCatching { FirebaseApp.initializeApp(context) }.getOrNull()
-            ?: return FirebaseServices(auth = null, firestore = null)
+            ?: return FirebaseAuthService(auth = null)
 
-        return FirebaseServices(
-            auth = runCatching { FirebaseAuth.getInstance(app) }.getOrNull(),
-            firestore = runCatching { FirebaseFirestore.getInstance(app) }.getOrNull()
+        return FirebaseAuthService(
+            auth = runCatching { FirebaseAuth.getInstance(app) }.getOrNull()
         )
     }
 }

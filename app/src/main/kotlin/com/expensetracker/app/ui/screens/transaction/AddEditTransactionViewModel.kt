@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.math.RoundingMode
+import java.time.LocalDate
 import java.time.LocalDateTime
 import javax.inject.Inject
 
@@ -127,6 +128,12 @@ class AddEditTransactionViewModel @Inject constructor(
 
     fun updateNotes(notes: String) {
         _uiState.update { it.copy(notes = notes) }
+    }
+
+    fun updateTransactionDate(date: LocalDate) {
+        _uiState.update {
+            it.copy(transactionTime = it.transactionTime.with(date))
+        }
     }
 
     fun acceptSuggestedCategory() {

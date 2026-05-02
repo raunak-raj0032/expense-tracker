@@ -3,7 +3,6 @@ package com.expensetracker.app.core.prefs
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -29,7 +28,6 @@ class UserPreferences @Inject constructor(
 ) {
     private val onboardingKey = booleanPreferencesKey("onboarding_seen")
     private val biometricKey = booleanPreferencesKey("biometric_enabled")
-    private val lastSyncKey = longPreferencesKey("last_sync_millis")
     private val homeCurrencyKey = stringPreferencesKey("home_currency")
     private val aiEnabledKey = booleanPreferencesKey("ai_enabled")
     private val aiLastErrorKey = stringPreferencesKey("ai_last_error")
@@ -38,14 +36,16 @@ class UserPreferences @Inject constructor(
     private val budgetNotifEnabledKey = booleanPreferencesKey("budget_notif_enabled")
     private val budgetNotifPeriodKey = stringPreferencesKey("budget_notif_period")
     private val budgetWidgetPeriodKey = stringPreferencesKey("budget_widget_period")
+    private val firstRunPermissionsPromptedKey = booleanPreferencesKey("first_run_permissions_prompted")
 
     val onboardingSeen: Flow<Boolean> = context.userPrefsDataStore.data.map { it[onboardingKey] ?: false }
     val biometricEnabled: Flow<Boolean> = context.userPrefsDataStore.data.map { it[biometricKey] ?: false }
-    val lastSyncMillis: Flow<Long> = context.userPrefsDataStore.data.map { it[lastSyncKey] ?: 0L }
     val homeCurrency: Flow<String> = context.userPrefsDataStore.data.map { it[homeCurrencyKey] ?: "INR" }
     val budgetNotifEnabled: Flow<Boolean> = context.userPrefsDataStore.data.map { it[budgetNotifEnabledKey] ?: false }
     val budgetNotifPeriod: Flow<String> = context.userPrefsDataStore.data.map { it[budgetNotifPeriodKey] ?: "MONTHLY" }
     val budgetWidgetPeriod: Flow<String> = context.userPrefsDataStore.data.map { it[budgetWidgetPeriodKey] ?: "MONTHLY" }
+    val firstRunPermissionsPrompted: Flow<Boolean> =
+        context.userPrefsDataStore.data.map { it[firstRunPermissionsPromptedKey] ?: false }
 
     val aiModelState: Flow<AiModelState> = context.userPrefsDataStore.data.map { prefs ->
         AiModelState(
@@ -64,18 +64,8 @@ class UserPreferences @Inject constructor(
         context.userPrefsDataStore.edit { it[biometricKey] = enabled }
     }
 
-    suspend fun setLastSyncMillis(millis: Long) {
-        context.userPrefsDataStore.edit { it[lastSyncKey] = millis }
-    }
-
     suspend fun setHomeCurrency(code: String) {
         context.userPrefsDataStore.edit { it[homeCurrencyKey] = code.uppercase() }
-    }
-
-    suspend fun clearSyncState() {
-        context.userPrefsDataStore.edit { prefs ->
-            prefs.remove(lastSyncKey)
-        }
     }
 
     suspend fun setAiEnabled(enabled: Boolean) {
@@ -115,6 +105,10 @@ class UserPreferences @Inject constructor(
 
     suspend fun setBudgetWidgetPeriod(period: String) {
         context.userPrefsDataStore.edit { it[budgetWidgetPeriodKey] = period }
+    }
+
+    suspend fun setFirstRunPermissionsPrompted(prompted: Boolean) {
+        context.userPrefsDataStore.edit { it[firstRunPermissionsPromptedKey] = prompted }
     }
 
     suspend fun clearAiModelState() {

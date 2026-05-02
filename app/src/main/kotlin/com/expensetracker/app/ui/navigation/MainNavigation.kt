@@ -1,5 +1,10 @@
 package com.expensetracker.app.ui.navigation
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -33,14 +38,19 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +58,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,9 +72,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.ContextCompat
 import com.expensetracker.app.auth.AuthState
 import com.expensetracker.app.auth.AuthViewModel
-import com.expensetracker.app.core.prefs.UserPreferences
 import com.expensetracker.app.ui.screens.login.EmailAuthScreen
 import com.expensetracker.app.ui.screens.login.LoginScreen
 import com.expensetracker.app.ui.screens.onboarding.OnboardingScreen
@@ -114,6 +125,7 @@ fun MainNavigation(
     val gateViewModel: AppGateViewModel = hiltViewModel()
     val onboardingSeen by gateViewModel.onboardingSeen.collectAsStateWithLifecycle()
     val homeCurrency by gateViewModel.homeCurrency.collectAsStateWithLifecycle()
+    val firstRunPermissionsPrompted by gateViewModel.firstRunPermissionsPrompted.collectAsStateWithLifecycle()
 
     LaunchedEffect(authState, onboardingSeen) {
         val seen = onboardingSeen ?: return@LaunchedEffect
@@ -282,7 +294,83 @@ fun MainNavigation(
             }
             }
         }
+
+        if (authState is AuthState.SignedIn && !firstRunPermissionsPrompted) {
+            FirstRunPermissionPrompt(
+                onPromptHandled = gateViewModel::markFirstRunPermissionsPrompted
+            )
+        }
     }
+}
+
+@Composable
+private fun FirstRunPermissionPrompt(
+    onPromptHandled: () -> Unit
+) {
+    val context = LocalContext.current
+    val missingPermissions = remember(context) {
+        firstRunRuntimePermissions().filter { permission ->
+            ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED
+        }
+    }
+    var showPrompt by remember(missingPermissions) { mutableStateOf(missingPermissions.isNotEmpty()) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        onPromptHandled()
+    }
+
+    LaunchedEffect(missingPermissions.isEmpty()) {
+        if (missingPermissions.isEmpty()) {
+            onPromptHandled()
+        }
+    }
+
+    if (!showPrompt || missingPermissions.isEmpty()) return
+
+    AlertDialog(
+        onDismissRequest = {
+            showPrompt = false
+            onPromptHandled()
+        },
+        title = { Text("Allow app permissions") },
+        text = {
+            Text(
+                "Pocket Pulse can scan transaction SMS messages and send budget or capture alerts. You can change these permissions later in Settings."
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    showPrompt = false
+                    permissionLauncher.launch(missingPermissions.toTypedArray())
+                }
+            ) {
+                Text("Continue")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = {
+                    showPrompt = false
+                    onPromptHandled()
+                }
+            ) {
+                Text("Not now")
+            }
+        }
+    )
+}
+
+private fun firstRunRuntimePermissions(): List<String> {
+    val permissions = mutableListOf(
+        Manifest.permission.READ_SMS,
+        Manifest.permission.RECEIVE_SMS
+    )
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        permissions += Manifest.permission.POST_NOTIFICATIONS
+    }
+    return permissions
 }
 
 @Composable

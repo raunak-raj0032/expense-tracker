@@ -267,6 +267,7 @@ class CaptureEventRepository @Inject constructor(
 
         var autoImported = false
         if (eventId > 0L
+            && sourceType != CaptureSourceType.SMS
             && entity.parseStatus == ParseStatus.SUCCESS.name
             && (trustPeerTransfer || !parseResult.isPeerTransfer)
             && parseResult.confidence >= 0.8f

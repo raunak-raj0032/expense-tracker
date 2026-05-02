@@ -1,5 +1,6 @@
 package com.expensetracker.app.ui.screens.transaction
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,10 +18,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -37,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -61,6 +66,10 @@ import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
 import com.expensetracker.app.ui.theme.appButtonSizing
 import com.expensetracker.app.ui.theme.financialFigures
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -177,6 +186,11 @@ fun AddEditTransactionScreen(
                     modifier = Modifier.fillMaxWidth(),
                     accent = MaterialTheme.colorScheme.tertiary
                 ) {
+                    TransactionDatePicker(
+                        selectedDate = uiState.transactionTime.toLocalDate(),
+                        onDateChange = viewModel::updateTransactionDate
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = uiState.description,
                         onValueChange = viewModel::updateDescription,
@@ -302,6 +316,71 @@ fun AddEditTransactionScreen(
                 }
             }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TransactionDatePicker(
+    selectedDate: LocalDate,
+    onDateChange: (LocalDate) -> Unit
+) {
+    var showDatePicker by remember { mutableStateOf(false) }
+    val formatter = remember { DateTimeFormatter.ofPattern("dd MMM yyyy") }
+
+    OutlinedTextField(
+        value = selectedDate.format(formatter),
+        onValueChange = {},
+        readOnly = true,
+        label = { Text("Date") },
+        trailingIcon = {
+            IconButton(onClick = { showDatePicker = true }) {
+                Icon(Icons.Default.DateRange, contentDescription = "Choose date")
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showDatePicker = true }
+            .testTag("transaction_date_input"),
+        singleLine = true,
+        colors = fieldColors()
+    )
+
+    if (showDatePicker) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDate.toEpochMillisStart()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pickerState.selectedDateMillis
+                            ?.toLocalDate()
+                            ?.let(onDateChange)
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("Apply")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(
+                state = pickerState,
+                title = {
+                    Text(
+                        text = "Transaction date",
+                        modifier = Modifier.padding(start = 24.dp, top = 16.dp)
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
@@ -543,3 +622,9 @@ private fun fieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedContainerColor = Color.Transparent,
     focusedContainerColor = Color.Transparent
 )
+
+private fun LocalDate.toEpochMillisStart(): Long =
+    atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+private fun Long.toLocalDate(): LocalDate =
+    Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDate()

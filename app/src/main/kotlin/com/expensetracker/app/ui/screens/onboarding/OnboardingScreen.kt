@@ -21,8 +21,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -71,12 +71,12 @@ private val slides = listOf(
     Slide(
         icon = Icons.Default.Insights,
         title = "Understand your money",
-        body = "Budgets, calendar heatmaps and category insights — all in one place."
+        body = "Budgets, calendar heatmaps and category insights, all in one place."
     ),
     Slide(
-        icon = Icons.Default.CloudSync,
-        title = "Safely backed up",
-        body = "Sign in with Google to sync your transactions privately to the cloud."
+        icon = Icons.Default.Lock,
+        title = "Private by default",
+        body = "Expense, account, budget and import data is stored locally on this device."
     )
 )
 

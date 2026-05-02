@@ -1,6 +1,7 @@
 package com.expensetracker.app.capture
 
 import android.accessibilityservice.AccessibilityService
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -213,6 +214,9 @@ class UpiAccessibilityService : AccessibilityService() {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setContentIntent(pi)
             .build()
+            .apply {
+                flags = flags or Notification.FLAG_NO_CLEAR or Notification.FLAG_ONGOING_EVENT
+            }
         runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 startForeground(

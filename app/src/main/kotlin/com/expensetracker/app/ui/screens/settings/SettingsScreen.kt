@@ -730,7 +730,7 @@ private fun AiSettingsCard(
 }
 
 private fun aiStatusLine(availability: AiAvailability): String = when (availability) {
-    is AiAvailability.Unsupported -> "Not available on this device"
+    is AiAvailability.Unsupported -> "Disabled for local-only privacy"
     AiAvailability.NeedsDownload -> "Configure the laptop Ollama host."
     is AiAvailability.Downloading -> "Downloading model..."
     AiAvailability.Ready -> "Ready. Phones can request insights from your laptop."
@@ -739,7 +739,7 @@ private fun aiStatusLine(availability: AiAvailability): String = when (availabil
 }
 
 private fun unsupportedMessage(reasons: List<AiCompatibility.Reason>): String {
-    if (reasons.isEmpty()) return "Device not supported."
+    if (reasons.isEmpty()) return "External AI insights are disabled so financial data stays on this device."
     val phrases = reasons.map {
         when (it) {
             AiCompatibility.Reason.UNSUPPORTED_ABI -> "needs a 64-bit ARM device"

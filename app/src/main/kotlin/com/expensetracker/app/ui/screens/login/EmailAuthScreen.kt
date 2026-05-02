@@ -104,10 +104,11 @@ fun EmailAuthScreen(
 
             Spacer(Modifier.height(20.dp))
             Text(
-                text = if (mode == EmailAuthMode.SignIn)
+                text = if (mode == EmailAuthMode.SignIn) {
                     "Welcome back. Enter your email and password."
-                else
-                    "Set up a new account with your email.",
+                } else {
+                    "Set up a new account with your email."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

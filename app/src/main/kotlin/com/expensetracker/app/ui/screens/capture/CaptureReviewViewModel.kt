@@ -41,7 +41,7 @@ class CaptureReviewViewModel @Inject constructor(
             val message = try {
                 val imported = captureEventRepository.importRecentSms(limit)
                 if (imported > 0) {
-                    "Imported $imported payment message(s) from your SMS history."
+                    "Added $imported SMS suggestion(s) for review."
                 } else {
                     "No new payment SMS messages were found."
                 }

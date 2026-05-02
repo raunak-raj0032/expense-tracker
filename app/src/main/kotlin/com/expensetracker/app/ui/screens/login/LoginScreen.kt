@@ -35,7 +35,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -69,7 +68,6 @@ fun LoginScreen(
 ) {
     val context = LocalContext.current
     val signingIn by viewModel.signingIn.collectAsStateWithLifecycle()
-    val guestBusy by viewModel.guestBusy.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
 
     val logoAnim = remember { Animatable(0f) }
@@ -181,21 +179,11 @@ fun LoginScreen(
                 SecondaryAuthButton(
                     label = "Continue with email",
                     icon = Icons.Default.Email,
-                    enabled = !signingIn && !guestBusy,
+                    enabled = !signingIn,
                     onClick = {
                         viewModel.clearError()
                         onContinueWithEmail()
                     }
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                SecondaryAuthButton(
-                    label = "Continue as guest",
-                    icon = Icons.Default.PersonOutline,
-                    loading = guestBusy,
-                    enabled = !signingIn,
-                    onClick = { viewModel.signInAsGuest() }
                 )
 
                 AnimatedVisibility(visible = error != null) {
@@ -213,7 +201,7 @@ fun LoginScreen(
                 Spacer(Modifier.height(24.dp))
 
                 Text(
-                    text = "By continuing you agree to keep your financial data\nprivate and on-device.",
+                    text = "Expense, budget, import, and account data stays on this device.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
                     textAlign = TextAlign.Center
@@ -378,3 +366,4 @@ private fun GoogleGlyph() {
         )
     }
 }
+
