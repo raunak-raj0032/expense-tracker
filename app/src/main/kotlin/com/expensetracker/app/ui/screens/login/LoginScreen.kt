@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
@@ -116,28 +115,17 @@ fun LoginScreen(
                     )
                     Box(
                         modifier = Modifier
-                            .size(112.dp)
+                            .size(160.dp)
                             .graphicsLayer {
                                 alpha = logoAnim.value
                                 scaleX = 0.6f + 0.4f * logoAnim.value
                                 scaleY = 0.6f + 0.4f * logoAnim.value
-                            }
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.tertiary
-                                    )
-                                )
-                            ),
+                            },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.AccountBalanceWallet,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(56.dp)
+                        com.expensetracker.app.ui.mascot.Piggy(
+                            mood = com.expensetracker.app.ui.mascot.PiggyMood.Wave,
+                            size = 150.dp
                         )
                     }
                 }

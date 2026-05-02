@@ -37,6 +37,7 @@ class UserPreferences @Inject constructor(
     private val budgetNotifPeriodKey = stringPreferencesKey("budget_notif_period")
     private val budgetWidgetPeriodKey = stringPreferencesKey("budget_widget_period")
     private val firstRunPermissionsPromptedKey = booleanPreferencesKey("first_run_permissions_prompted")
+    private val tutorialSeenKey = booleanPreferencesKey("tutorial_seen")
 
     val onboardingSeen: Flow<Boolean> = context.userPrefsDataStore.data.map { it[onboardingKey] ?: false }
     val biometricEnabled: Flow<Boolean> = context.userPrefsDataStore.data.map { it[biometricKey] ?: false }
@@ -46,6 +47,8 @@ class UserPreferences @Inject constructor(
     val budgetWidgetPeriod: Flow<String> = context.userPrefsDataStore.data.map { it[budgetWidgetPeriodKey] ?: "MONTHLY" }
     val firstRunPermissionsPrompted: Flow<Boolean> =
         context.userPrefsDataStore.data.map { it[firstRunPermissionsPromptedKey] ?: false }
+    val tutorialSeen: Flow<Boolean> =
+        context.userPrefsDataStore.data.map { it[tutorialSeenKey] ?: false }
 
     val aiModelState: Flow<AiModelState> = context.userPrefsDataStore.data.map { prefs ->
         AiModelState(
@@ -109,6 +112,10 @@ class UserPreferences @Inject constructor(
 
     suspend fun setFirstRunPermissionsPrompted(prompted: Boolean) {
         context.userPrefsDataStore.edit { it[firstRunPermissionsPromptedKey] = prompted }
+    }
+
+    suspend fun setTutorialSeen(seen: Boolean) {
+        context.userPrefsDataStore.edit { it[tutorialSeenKey] = seen }
     }
 
     suspend fun clearAiModelState() {

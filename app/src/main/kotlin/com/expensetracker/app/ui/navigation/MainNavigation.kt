@@ -48,16 +48,20 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -89,6 +93,7 @@ import com.expensetracker.app.ui.screens.ledger.LedgerScreen
 import com.expensetracker.app.ui.screens.settings.SettingsScreen
 import com.expensetracker.app.ui.screens.tags.TagsManagementScreen
 import com.expensetracker.app.ui.screens.transaction.AddEditTransactionScreen
+import com.expensetracker.app.ui.mascot.TutorialTarget
 import com.expensetracker.app.ui.theme.AuroraBackground
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 
@@ -126,6 +131,11 @@ fun MainNavigation(
     val onboardingSeen by gateViewModel.onboardingSeen.collectAsStateWithLifecycle()
     val homeCurrency by gateViewModel.homeCurrency.collectAsStateWithLifecycle()
     val firstRunPermissionsPrompted by gateViewModel.firstRunPermissionsPrompted.collectAsStateWithLifecycle()
+    val tutorialSeen by gateViewModel.tutorialSeen.collectAsStateWithLifecycle()
+    val tutorialTargets = remember { mutableStateMapOf<TutorialTarget, Rect>() }
+    val onTutorialTargetPositioned: (TutorialTarget, Rect) -> Unit = { target, bounds ->
+        tutorialTargets[target] = bounds
+    }
 
     LaunchedEffect(authState, onboardingSeen) {
         val seen = onboardingSeen ?: return@LaunchedEffect
@@ -177,6 +187,9 @@ fun MainNavigation(
                     PremiumNavBar(
                         items = bottomNavItems,
                         currentDestination = currentDestination,
+                        modifier = Modifier.onGloballyPositioned {
+                            tutorialTargets[TutorialTarget.BottomBar] = it.boundsInRoot()
+                        },
                         onItemClick = { item ->
                             navController.navigate(item.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
@@ -231,7 +244,8 @@ fun MainNavigation(
                         onOpenCaptureInbox   = { navController.navigate(Screen.CaptureInbox.route) },
                         onOpenStatementImport= { navController.navigate(Screen.Import.route) },
                         onTransactionClick   = { navController.navigate(Screen.EditTransaction.createRoute(it)) },
-                        onOpenProfile        = { navController.navigate(Screen.Profile.route) }
+                        onOpenProfile        = { navController.navigate(Screen.Profile.route) },
+                        onTutorialTargetPositioned = onTutorialTargetPositioned
                     )
                 }
                 composable(Screen.Ledger.route) {
@@ -260,6 +274,14 @@ fun MainNavigation(
                         onOpenBudget          = { navController.navigate(Screen.Budgets.route) },
                         onOpenStatementImport = { navController.navigate(Screen.Import.route) },
                         onOpenTags            = { navController.navigate(Screen.Tags.route) },
+                        onReplayTutorial      = {
+                            gateViewModel.replayTutorial()
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
                         isDarkModeEnabled     = darkThemeEnabled,
                         onDarkModeChange      = onDarkThemeChange
                     )
@@ -298,6 +320,23 @@ fun MainNavigation(
         if (authState is AuthState.SignedIn && !firstRunPermissionsPrompted) {
             FirstRunPermissionPrompt(
                 onPromptHandled = gateViewModel::markFirstRunPermissionsPrompted
+            )
+        }
+
+        // Penny's guided tour — runs once after sign-in, after the perms prompt, while on Home.
+        val onHome = currentDestination?.route == Screen.Home.route
+        val showTutorial = authState is AuthState.SignedIn &&
+            firstRunPermissionsPrompted &&
+            !tutorialSeen &&
+            onHome
+        AnimatedVisibility(
+            visible = showTutorial,
+            enter = fadeIn(tween(420)),
+            exit = fadeOut(tween(280))
+        ) {
+            com.expensetracker.app.ui.mascot.TutorialOverlay(
+                onFinish = gateViewModel::markTutorialSeen,
+                targetBounds = tutorialTargets
             )
         }
     }
@@ -377,6 +416,7 @@ private fun firstRunRuntimePermissions(): List<String> {
 private fun PremiumNavBar(
     items: List<BottomNavItem>,
     currentDestination: androidx.navigation.NavDestination?,
+    modifier: Modifier = Modifier,
     onItemClick: (BottomNavItem) -> Unit
 ) {
     val primary       = MaterialTheme.colorScheme.primary
@@ -384,7 +424,7 @@ private fun PremiumNavBar(
     val surfaceVariant= MaterialTheme.colorScheme.surfaceVariant
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = ScreenEdgePadding, vertical = 12.dp)
             .navigationBarsPadding()

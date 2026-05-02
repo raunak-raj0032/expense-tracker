@@ -24,9 +24,21 @@ class AppGateViewModel @Inject constructor(
         userPreferences.firstRunPermissionsPrompted
             .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val tutorialSeen: StateFlow<Boolean> =
+        userPreferences.tutorialSeen
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     fun markFirstRunPermissionsPrompted() {
         viewModelScope.launch {
             userPreferences.setFirstRunPermissionsPrompted(true)
         }
+    }
+
+    fun markTutorialSeen() {
+        viewModelScope.launch { userPreferences.setTutorialSeen(true) }
+    }
+
+    fun replayTutorial() {
+        viewModelScope.launch { userPreferences.setTutorialSeen(false) }
     }
 }

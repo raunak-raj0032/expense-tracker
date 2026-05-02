@@ -101,6 +101,7 @@ fun SettingsScreen(
     onOpenBudget: () -> Unit = {},
     onOpenStatementImport: () -> Unit = {},
     onOpenTags: () -> Unit = {},
+    onReplayTutorial: () -> Unit = {},
     isDarkModeEnabled: Boolean = true,
     onDarkModeChange: (Boolean) -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
@@ -348,6 +349,15 @@ fun SettingsScreen(
 
             // About
             item { SettingsSectionLabel("About") }
+            item {
+                SettingsItem(
+                    icon     = Icons.Default.AutoAwesome,
+                    title    = "Meet Penny again",
+                    subtitle = "Replay the guided tour",
+                    accent   = MaterialTheme.colorScheme.primary,
+                    onClick  = onReplayTutorial
+                )
+            }
             item {
                 SettingsItem(
                     icon     = Icons.Default.Info,

@@ -64,9 +64,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,6 +85,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.expensetracker.app.auth.AuthState
 import com.expensetracker.app.auth.AuthViewModel
 import com.expensetracker.app.core.model.Transaction
+import com.expensetracker.app.ui.mascot.TutorialTarget
 import com.expensetracker.app.ui.theme.AccentDivider
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.GlowProgressBar
@@ -108,6 +112,7 @@ fun HomeScreen(
     onOpenStatementImport: () -> Unit,
     onTransactionClick: (Long) -> Unit,
     onOpenProfile: () -> Unit = {},
+    onTutorialTargetPositioned: (TutorialTarget, Rect) -> Unit = { _, _ -> },
     viewModel: HomeViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
@@ -196,6 +201,9 @@ fun HomeScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick          = onAddTransaction,
+                modifier = Modifier.onGloballyPositioned {
+                    onTutorialTargetPositioned(TutorialTarget.AddButton, it.boundsInRoot())
+                },
                 containerColor   = MaterialTheme.colorScheme.primary,
                 contentColor     = MaterialTheme.colorScheme.onPrimary,
                 elevation        = FloatingActionButtonDefaults.elevation(8.dp, 12.dp),
@@ -226,6 +234,9 @@ fun HomeScreen(
                     )
                 ) {
                     MonthlySummaryCard(
+                        modifier = Modifier.onGloballyPositioned {
+                            onTutorialTargetPositioned(TutorialTarget.MonthlySummary, it.boundsInRoot())
+                        },
                         monthName            = uiState.monthName,
                         totalExpense         = uiState.totalExpense,
                         totalIncome          = uiState.totalIncome,
@@ -258,7 +269,10 @@ fun HomeScreen(
                         onAddTransaction    = onAddTransaction,
                         onOpenBudget        = onOpenBudget,
                         onOpenCaptureInbox  = onOpenCaptureInbox,
-                        onOpenStatementImport = onOpenStatementImport
+                        onOpenStatementImport = onOpenStatementImport,
+                        modifier = Modifier.onGloballyPositioned {
+                            onTutorialTargetPositioned(TutorialTarget.QuickActions, it.boundsInRoot())
+                        }
                     )
                 }
             }
@@ -306,8 +320,8 @@ fun HomeScreen(
             if (uiState.recentTransactions.isEmpty()) {
                 item {
                     EmptyStateCard(
-                        message = "No transactions yet",
-                        action  = "Tap + to log your first one"
+                        message = "Hmm, my belly's empty.",
+                        action  = "Tap the + button to feed me your first transaction!"
                     )
                 }
             } else {
@@ -373,7 +387,8 @@ fun MonthlySummaryCard(
     streakDays: Int,
     dayOfMonth: Int,
     daysInMonth: Int,
-    netFlow: Long
+    netFlow: Long,
+    modifier: Modifier = Modifier
 ) {
     val coveragePercent = if (dayOfMonth > 0)
         ((activeDays.toFloat() / dayOfMonth.toFloat()) * 100f).roundToInt() else 0
@@ -398,7 +413,7 @@ fun MonthlySummaryCard(
 
     // Hero card — dramatic net flow display
     GlassPanel(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         accent   = MaterialTheme.colorScheme.primary
     ) {
         // Header row
@@ -729,10 +744,11 @@ private fun QuickActionGrid(
     onAddTransaction: () -> Unit,
     onOpenBudget: () -> Unit,
     onOpenCaptureInbox: () -> Unit,
-    onOpenStatementImport: () -> Unit
+    onOpenStatementImport: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     GlassPanel(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         accent   = MaterialTheme.colorScheme.secondary
     ) {
         SectionHeader(
@@ -943,19 +959,14 @@ fun TransactionListItem(
 fun EmptyStateCard(message: String, action: String) {
     GlassPanel(modifier = Modifier.fillMaxWidth(), accent = MaterialTheme.colorScheme.tertiary) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Receipt, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(28.dp))
-            }
+            com.expensetracker.app.ui.mascot.Piggy(
+                mood = com.expensetracker.app.ui.mascot.PiggyMood.Curious,
+                size = 120.dp
+            )
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(message, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text(action, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

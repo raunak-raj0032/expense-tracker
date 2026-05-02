@@ -2,9 +2,15 @@
 
 package com.expensetracker.app.ui.screens.onboarding
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,16 +21,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Insights
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,9 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -45,6 +45,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expensetracker.app.core.prefs.UserPreferences
+import com.expensetracker.app.ui.mascot.PennyAssetSet
+import com.expensetracker.app.ui.mascot.Piggy
+import com.expensetracker.app.ui.mascot.PiggyMood
 import com.expensetracker.app.ui.theme.AuroraBackground
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -60,24 +63,43 @@ class OnboardingViewModel @Inject constructor(
     }
 }
 
-private data class Slide(val icon: ImageVector, val title: String, val body: String)
+private data class Slide(
+    val mood: PiggyMood,
+    val assetSet: PennyAssetSet,
+    val line: String,
+    val title: String,
+    val body: String,
+)
 
 private val slides = listOf(
     Slide(
-        icon = Icons.Default.AutoAwesome,
-        title = "Capture effortlessly",
-        body = "SMS, notifications and PDF statements turn into transactions automatically."
+        mood = PiggyMood.Happy,
+        assetSet = PennyAssetSet.Auto,
+        line = "Hi! I'm Penny — your money buddy.",
+        title = "Meet Penny",
+        body = "I'll keep an eye on every rupee that comes and goes, so you don't have to."
     ),
     Slide(
-        icon = Icons.Default.Insights,
-        title = "Understand your money",
-        body = "Budgets, calendar heatmaps and category insights, all in one place."
+        mood = PiggyMood.Coin,
+        assetSet = PennyAssetSet.Full,
+        line = "Got a payment SMS? *gulp* — straight in.",
+        title = "Capture on autopilot",
+        body = "SMS, notifications and PDF statements turn into transactions automatically. No typing required."
     ),
     Slide(
-        icon = Icons.Default.Lock,
+        mood = PiggyMood.Curious,
+        assetSet = PennyAssetSet.HalfCut,
+        line = "Where's your money going? Let's find out.",
+        title = "See the bigger picture",
+        body = "Budgets, calendar heatmaps and category insights — your spending finally makes sense."
+    ),
+    Slide(
+        mood = PiggyMood.Love,
+        assetSet = PennyAssetSet.HalfCut,
+        line = "Your secrets are safe with me. Pinky promise!",
         title = "Private by default",
-        body = "Expense, account, budget and import data is stored locally on this device."
-    )
+        body = "Everything stays on this device. No clouds. No prying eyes. Just you and me."
+    ),
 )
 
 @Composable
@@ -149,7 +171,11 @@ fun OnboardingScreen(
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Text(
-                        text = if (pagerState.currentPage < slides.lastIndex) "Next" else "Get started",
+                        text = when (pagerState.currentPage) {
+                            0 -> "Nice to meet you, Penny"
+                            slides.lastIndex -> "Let's go!"
+                            else -> "Tell me more"
+                        },
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -163,32 +189,28 @@ private fun SlideContent(slide: Slide) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(horizontal = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(140.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.tertiary
-                        )
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = slide.icon,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(64.dp)
-            )
+        Piggy(mood = slide.mood, size = 200.dp, assetSet = slide.assetSet)
+
+        Spacer(Modifier.height(20.dp))
+
+        // Penny's voice — small chat bubble that fades between slides
+        AnimatedContent(
+            targetState = slide.line,
+            transitionSpec = {
+                (slideInVertically { it / 3 } + fadeIn(tween(420))) togetherWith
+                    (slideOutVertically { -it / 3 } + fadeOut(tween(220)))
+            },
+            label = "penny-line"
+        ) { line ->
+            SpeechBubble(line)
         }
-        Spacer(Modifier.height(40.dp))
+
+        Spacer(Modifier.height(28.dp))
+
         Text(
             text = slide.title,
             style = MaterialTheme.typography.headlineMedium,
@@ -200,6 +222,25 @@ private fun SlideContent(slide: Slide) {
             text = slide.body,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun SpeechBubble(text: String) {
+    Box(
+        modifier = Modifier
+            .widthIn(max = 320.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
+            .padding(horizontal = 18.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
     }
