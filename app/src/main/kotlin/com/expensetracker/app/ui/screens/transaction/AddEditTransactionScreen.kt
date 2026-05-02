@@ -1,8 +1,11 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.expensetracker.app.ui.screens.transaction
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -141,38 +145,28 @@ fun AddEditTransactionScreen(
                 .padding(padding),
             contentPadding = PaddingValues(
                 start = ScreenEdgePadding,
-                top = 8.dp,
+                top = 4.dp,
                 end = ScreenEdgePadding,
-                bottom = 110.dp
+                bottom = 96.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
                 GlassPanel(
                     modifier = Modifier.fillMaxWidth(),
-                    accent = MaterialTheme.colorScheme.primary
+                    accent = MaterialTheme.colorScheme.primary,
+                    contentPadding = PaddingValues(14.dp)
                 ) {
                     SectionHeader(
                         eyebrow = if (transactionId == null) "New Entry" else "Edit Entry",
-                        title = if (transactionId == null) "Add a transaction" else "Update transaction details",
-                        subtitle = "Choose the type, amount, account, and notes so this entry stays easy to review later."
+                        title = if (transactionId == null) "Transaction details" else "Update details",
+                        subtitle = "Type, amount, and account."
                     )
                     TransactionTypeSelector(
                         selectedType = uiState.transactionType,
                         onTypeChange = viewModel::updateTransactionType
                     )
-                }
-            }
-
-            item {
-                GlassPanel(
-                    modifier = Modifier.fillMaxWidth(),
-                    accent = if (uiState.transactionType == TransactionType.EXPENSE) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.secondary
-                    }
-                ) {
+                    Spacer(modifier = Modifier.height(8.dp))
                     AmountInput(
                         amount = uiState.amount,
                         onAmountChange = viewModel::updateAmount,
@@ -184,13 +178,14 @@ fun AddEditTransactionScreen(
             item {
                 GlassPanel(
                     modifier = Modifier.fillMaxWidth(),
-                    accent = MaterialTheme.colorScheme.tertiary
+                    accent = MaterialTheme.colorScheme.tertiary,
+                    contentPadding = PaddingValues(14.dp)
                 ) {
                     TransactionDatePicker(
                         selectedDate = uiState.transactionTime.toLocalDate(),
                         onDateChange = viewModel::updateTransactionDate
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = uiState.description,
                         onValueChange = viewModel::updateDescription,
@@ -207,7 +202,8 @@ fun AddEditTransactionScreen(
             item {
                 GlassPanel(
                     modifier = Modifier.fillMaxWidth(),
-                    accent = MaterialTheme.colorScheme.secondary
+                    accent = MaterialTheme.colorScheme.secondary,
+                    contentPadding = PaddingValues(14.dp)
                 ) {
                     CategorySuggestionBanner(
                         suggestedCategoryId = uiState.suggestedCategoryId,
@@ -231,7 +227,8 @@ fun AddEditTransactionScreen(
             item {
                 GlassPanel(
                     modifier = Modifier.fillMaxWidth(),
-                    accent = MaterialTheme.colorScheme.tertiary
+                    accent = MaterialTheme.colorScheme.tertiary,
+                    contentPadding = PaddingValues(14.dp)
                 ) {
                     OutlinedTextField(
                         value = uiState.notes,
@@ -240,7 +237,7 @@ fun AddEditTransactionScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("transaction_notes_input"),
-                        maxLines = 3,
+                        maxLines = 2,
                         colors = fieldColors()
                     )
                     TagSelector(
@@ -389,27 +386,44 @@ fun TransactionTypeSelector(
     selectedType: TransactionType,
     onTypeChange: (TransactionType) -> Unit
 ) {
-    Row(
+    FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        maxItemsInEachRow = 2
     ) {
-        TransactionType.entries.forEach { type ->
+        listOf(
+            TransactionType.EXPENSE,
+            TransactionType.INCOME,
+            TransactionType.TRANSFER,
+            TransactionType.REFUND
+        ).forEach { type ->
             FilterChip(
                 selected = selectedType == type,
                 onClick = { onTypeChange(type) },
                 label = {
                     Text(
-                        text = type.name.lowercase().replaceFirstChar { it.uppercase() },
+                        text = transactionTypeLabel(type),
                         maxLines = 1,
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (selectedType == type) FontWeight.Bold else FontWeight.Medium
                     )
                 },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .widthIn(min = 120.dp)
             )
         }
     }
 }
+
+private fun transactionTypeLabel(type: TransactionType): String =
+    when (type) {
+        TransactionType.EXPENSE -> "Expense"
+        TransactionType.INCOME -> "Income"
+        TransactionType.TRANSFER -> "Transfer"
+        TransactionType.REFUND -> "Refund"
+    }
 
 @Composable
 fun AmountInput(
@@ -430,7 +444,7 @@ fun AmountInput(
         label = { Text("Amount") },
         leadingIcon = { Text("\u20B9", style = MaterialTheme.typography.titleLarge) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        textStyle = MaterialTheme.typography.headlineMedium.copy(
+        textStyle = MaterialTheme.typography.titleLarge.copy(
             fontWeight = FontWeight.Bold,
             color = if (isExpense) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
         ).financialFigures(FontWeight.ExtraBold),

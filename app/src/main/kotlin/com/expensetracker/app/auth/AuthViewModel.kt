@@ -43,6 +43,17 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    fun signInAsGuest() {
+        if (_signingIn.value) return
+        _signingIn.value = true
+        _error.value = null
+        viewModelScope.launch {
+            runCatching { repository.signInAsGuest() }
+                .onFailure { _error.value = it.message ?: "Guest sign-in failed" }
+            _signingIn.value = false
+        }
+    }
+
     fun signInWithEmail(email: String, password: String) {
         if (_emailBusy.value) return
         _emailBusy.value = true

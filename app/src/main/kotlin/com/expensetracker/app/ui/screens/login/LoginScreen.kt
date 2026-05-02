@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -183,6 +184,18 @@ fun LoginScreen(
                     onClick = {
                         viewModel.clearError()
                         onContinueWithEmail()
+                    }
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                SecondaryAuthButton(
+                    label = "Continue as guest",
+                    icon = Icons.Default.Person,
+                    enabled = !signingIn,
+                    onClick = {
+                        viewModel.clearError()
+                        viewModel.signInAsGuest()
                     }
                 )
 

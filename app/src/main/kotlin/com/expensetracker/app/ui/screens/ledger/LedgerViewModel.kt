@@ -74,7 +74,7 @@ class LedgerViewModel @Inject constructor(
 
     init {
         observeLookups()
-        loadTransactions()
+        observeTransactions()
     }
 
     private fun observeLookups() {
@@ -95,14 +95,16 @@ class LedgerViewModel @Inject constructor(
         }
     }
 
-    private fun loadTransactions() {
+    private fun observeTransactions() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            allTransactions = transactionRepository.getAll()
-            tagsByTransaction = allTransactions.associate { tx ->
-                tx.id to transactionTagDao.getTagIdsForTransaction(tx.id).toSet()
+            transactionRepository.observeAll().collect { transactions ->
+                allTransactions = transactions
+                tagsByTransaction = transactions.associate { tx ->
+                    tx.id to transactionTagDao.getTagIdsForTransaction(tx.id).toSet()
+                }
+                applyFiltersInternal()
             }
-            applyFiltersInternal()
         }
     }
 
@@ -220,7 +222,6 @@ class LedgerViewModel @Inject constructor(
     fun deleteTransaction(id: Long) {
         viewModelScope.launch {
             transactionRepository.delete(id)
-            loadTransactions()
         }
     }
 
@@ -244,7 +245,6 @@ class LedgerViewModel @Inject constructor(
         viewModelScope.launch {
             transactionRepository.deleteAll(ids)
             _uiState.update { it.copy(selectedTransactionIds = emptySet()) }
-            loadTransactions()
         }
     }
 

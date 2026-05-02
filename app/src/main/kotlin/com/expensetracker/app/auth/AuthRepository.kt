@@ -88,6 +88,15 @@ class AuthRepository @Inject constructor(
         firebaseAuth.signInWithCredential(firebaseCredential).await()
     }
 
+    suspend fun signInAsGuest() {
+        val firebaseAuth = firebaseAuthService.auth ?: throw firebaseNotConfigured()
+        try {
+            firebaseAuth.signInAnonymously().await()
+        } catch (t: Throwable) {
+            throw AuthException(friendlyAuthMessage(t), t)
+        }
+    }
+
     suspend fun signInWithEmail(email: String, password: String) {
         val firebaseAuth = firebaseAuthService.auth ?: throw firebaseNotConfigured()
         val e = email.trim()
@@ -156,6 +165,10 @@ class AuthRepository @Inject constructor(
             raw.contains("email address is already", ignoreCase = true) ||
                 raw.contains("email-already-in-use", ignoreCase = true) ->
                 "An account already exists for this email"
+            raw.contains("OPERATION_NOT_ALLOWED", ignoreCase = true) ||
+                raw.contains("CONFIGURATION_NOT_FOUND", ignoreCase = true) ||
+                raw.contains("admin-restricted-operation", ignoreCase = true) ->
+                "Guest sign-in is not enabled in Firebase Auth"
             raw.contains("badly formatted", ignoreCase = true) ||
                 raw.contains("invalid-email", ignoreCase = true) ->
                 "That email address doesn't look right"
