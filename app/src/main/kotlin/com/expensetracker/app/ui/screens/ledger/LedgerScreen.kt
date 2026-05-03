@@ -81,7 +81,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.expensetracker.app.core.model.Account
-import com.expensetracker.app.core.model.Category
 import com.expensetracker.app.core.model.Tag
 import com.expensetracker.app.core.model.TransactionType
 import com.expensetracker.app.ui.screens.home.TransactionListItem
@@ -302,7 +301,6 @@ fun LedgerScreen(
                 state              = uiState,
                 onTypesChange      = viewModel::updateSelectedTypes,
                 onAccountsChange   = viewModel::updateSelectedAccounts,
-                onCategoriesChange = viewModel::updateSelectedCategories,
                 onTagsChange       = viewModel::updateSelectedTags,
                 onDatePreset       = viewModel::setDatePreset,
                 onCustomRange      = viewModel::setCustomDateRange,
@@ -386,7 +384,6 @@ fun FilterSheet(
     state: LedgerUiState,
     onTypesChange: (Set<TransactionType>) -> Unit,
     onAccountsChange: (Set<Long>) -> Unit,
-    onCategoriesChange: (Set<Long>) -> Unit,
     onTagsChange: (Set<Long>) -> Unit,
     onDatePreset: (DateRangePreset) -> Unit,
     onCustomRange: (LocalDate, LocalDate) -> Unit,
@@ -507,23 +504,6 @@ fun FilterSheet(
                                 onAccountsChange(if (selected) state.selectedAccountIds - account.id else state.selectedAccountIds + account.id)
                             },
                             label = { Text(account.name) }
-                        )
-                    }
-                }
-            }
-        }
-
-        if (state.categories.isNotEmpty()) {
-            FilterSection(title = "Categories") {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.categories.forEach { category ->
-                        val selected = state.selectedCategoryIds.contains(category.id)
-                        FilterChip(
-                            selected = selected,
-                            onClick = {
-                                onCategoriesChange(if (selected) state.selectedCategoryIds - category.id else state.selectedCategoryIds + category.id)
-                            },
-                            label = { Text(category.name) }
                         )
                     }
                 }

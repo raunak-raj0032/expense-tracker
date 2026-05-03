@@ -15,6 +15,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -45,10 +46,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
@@ -198,16 +201,16 @@ fun TutorialOverlay(
                         text = stepNow.line,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(8.dp))
                     Piggy(
                         mood = stepNow.mood,
-                        size = if (stepNow.assetSet == PennyAssetSet.Full) 132.dp else 122.dp,
+                        size = if (stepNow.assetSet == PennyAssetSet.Full) 132.dp else 104.dp,
                         assetSet = stepNow.assetSet
                     )
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
             Button(
                 onClick = {
@@ -368,14 +371,24 @@ private fun SpeechBubble(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color.White.copy(alpha = 0.97f))
-            .padding(horizontal = 16.dp, vertical = 13.dp)
+            .shadow(elevation = 8.dp, shape = RoundedCornerShape(20.dp))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.White, Color(0xFFF0FFF9))
+                ),
+                shape = RoundedCornerShape(20.dp)
+            )
+            .border(
+                width = 1.dp,
+                color = Color(0xFF00E5A0).copy(alpha = 0.45f),
+                shape = RoundedCornerShape(20.dp)
+            )
+            .padding(horizontal = 18.dp, vertical = 12.dp)
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.SemiBold,
             color = Color(0xFF1B0F1F),
             textAlign = TextAlign.Center
         )

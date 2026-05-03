@@ -24,12 +24,12 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -513,7 +513,7 @@ fun StatementImportScreen(
                                 .fillMaxWidth()
                                 .appButtonSizing()
                         ) {
-                            Icon(Icons.Default.ReceiptLong, contentDescription = null)
+                            Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null)
                             Spacer(modifier = Modifier.size(8.dp))
                             Text(if (uiState.isImporting) "Importing..." else "Import to Ledger")
                         }
@@ -633,7 +633,7 @@ private fun EmptyStatementState() {
                 color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f)
             ) {
                 Icon(
-                    imageVector = Icons.Default.ReceiptLong,
+                    imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.padding(16.dp)

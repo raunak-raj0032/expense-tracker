@@ -30,7 +30,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.Rule
 import androidx.compose.material.icons.filled.AccountBalance
-import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.DarkMode
@@ -208,7 +207,6 @@ fun SettingsScreen(
             // Data
             item { SettingsSectionLabel("Data") }
             item { SettingsItem(Icons.Default.AccountBalance, "Accounts",    "Manage your accounts",         accent = MaterialTheme.colorScheme.secondary) { showPrototypeMessage("Accounts") } }
-            item { SettingsItem(Icons.Default.Category,       "Categories",  "Manage categories",            accent = MaterialTheme.colorScheme.secondary) { showPrototypeMessage("Categories") } }
             item { SettingsItem(Icons.AutoMirrored.Filled.Label, "Tags",     "Manage tags",                  accent = MaterialTheme.colorScheme.secondary, onClick = onOpenTags) }
 
             // Automation

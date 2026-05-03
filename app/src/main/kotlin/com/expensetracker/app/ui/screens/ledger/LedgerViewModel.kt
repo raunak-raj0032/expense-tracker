@@ -3,12 +3,10 @@ package com.expensetracker.app.ui.screens.ledger
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expensetracker.app.core.data.repository.AccountRepository
-import com.expensetracker.app.core.data.repository.CategoryRepository
 import com.expensetracker.app.core.data.repository.TagRepository
 import com.expensetracker.app.core.data.repository.TransactionRepository
 import com.expensetracker.app.core.database.dao.TransactionTagDao
 import com.expensetracker.app.core.model.Account
-import com.expensetracker.app.core.model.Category
 import com.expensetracker.app.core.model.Tag
 import com.expensetracker.app.core.model.Transaction
 import com.expensetracker.app.core.model.TransactionType
@@ -32,7 +30,6 @@ data class LedgerUiState(
     val searchQuery: String = "",
     val selectedTypes: Set<TransactionType> = emptySet(),
     val selectedAccountIds: Set<Long> = emptySet(),
-    val selectedCategoryIds: Set<Long> = emptySet(),
     val selectedTagIds: Set<Long> = emptySet(),
     val startDate: LocalDate? = null,
     val endDate: LocalDate? = null,
@@ -40,7 +37,6 @@ data class LedgerUiState(
     val minAmount: String = "",
     val maxAmount: String = "",
     val accounts: List<Account> = emptyList(),
-    val categories: List<Category> = emptyList(),
     val tags: List<Tag> = emptyList(),
     val isLoading: Boolean = false,
     val selectedTransactionIds: Set<Long> = emptySet()
@@ -50,7 +46,6 @@ data class LedgerUiState(
         get() = listOf(
             selectedTypes.isNotEmpty(),
             selectedAccountIds.isNotEmpty(),
-            selectedCategoryIds.isNotEmpty(),
             selectedTagIds.isNotEmpty(),
             datePreset != DateRangePreset.ALL,
             minAmount.isNotBlank() || maxAmount.isNotBlank()
@@ -61,7 +56,6 @@ data class LedgerUiState(
 class LedgerViewModel @Inject constructor(
     private val transactionRepository: TransactionRepository,
     private val accountRepository: AccountRepository,
-    private val categoryRepository: CategoryRepository,
     private val tagRepository: TagRepository,
     private val transactionTagDao: TransactionTagDao
 ) : ViewModel() {
@@ -81,11 +75,6 @@ class LedgerViewModel @Inject constructor(
         viewModelScope.launch {
             accountRepository.observeActive().collect { accounts ->
                 _uiState.update { it.copy(accounts = accounts) }
-            }
-        }
-        viewModelScope.launch {
-            categoryRepository.observeTree().collect { categories ->
-                _uiState.update { it.copy(categories = categories) }
             }
         }
         viewModelScope.launch {
@@ -127,8 +116,6 @@ class LedgerViewModel @Inject constructor(
                 (state.selectedAccountIds.isEmpty() ||
                     tx.accountId in state.selectedAccountIds ||
                     (tx.counterpartyAccountId != null && tx.counterpartyAccountId in state.selectedAccountIds)) &&
-                (state.selectedCategoryIds.isEmpty() ||
-                    (tx.categoryId != null && tx.categoryId in state.selectedCategoryIds)) &&
                 (state.selectedTagIds.isEmpty() ||
                     txTags.any { it in state.selectedTagIds }) &&
                 (startMillis == null || txMillis >= startMillis) &&
@@ -152,10 +139,6 @@ class LedgerViewModel @Inject constructor(
 
     fun updateSelectedAccounts(accountIds: Set<Long>) {
         _uiState.update { it.copy(selectedAccountIds = accountIds) }
-    }
-
-    fun updateSelectedCategories(categoryIds: Set<Long>) {
-        _uiState.update { it.copy(selectedCategoryIds = categoryIds) }
     }
 
     fun updateSelectedTags(tagIds: Set<Long>) {
@@ -207,7 +190,6 @@ class LedgerViewModel @Inject constructor(
                 searchQuery = "",
                 selectedTypes = emptySet(),
                 selectedAccountIds = emptySet(),
-                selectedCategoryIds = emptySet(),
                 selectedTagIds = emptySet(),
                 startDate = null,
                 endDate = null,
@@ -254,8 +236,6 @@ class LedgerViewModel @Inject constructor(
         if (description?.contains(q, ignoreCase = true) == true) return true
         if (notes?.contains(q, ignoreCase = true) == true) return true
         val state = _uiState.value
-        val catName = categoryId?.let { id -> state.categories.firstOrNull { it.id == id }?.name }
-        if (catName?.contains(q, ignoreCase = true) == true) return true
         val accName = state.accounts.firstOrNull { it.id == accountId }?.name
         if (accName?.contains(q, ignoreCase = true) == true) return true
         return false

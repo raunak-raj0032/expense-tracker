@@ -3,7 +3,6 @@ package com.expensetracker.app.ui.screens.transaction
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expensetracker.app.core.data.repository.AccountRepository
-import com.expensetracker.app.core.data.repository.CategoryRepository
 import com.expensetracker.app.core.data.repository.TagRepository
 import com.expensetracker.app.core.data.repository.TransactionRepository
 import com.expensetracker.app.core.model.*
@@ -12,7 +11,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.math.RoundingMode
 import java.time.LocalDate
@@ -24,16 +22,12 @@ data class AddEditTransactionUiState(
     val transactionType: TransactionType = TransactionType.EXPENSE,
     val amount: String = "",
     val accountId: Long = 0,
-    val categoryId: Long? = null,
-    val categoryManuallyChosen: Boolean = false,
-    val suggestedCategoryId: Long? = null,
     val counterpartyAccountId: Long? = null,
     val description: String = "",
     val notes: String = "",
     val selectedTags: Set<Long> = emptySet(),
     val transactionTime: LocalDateTime = LocalDateTime.now(),
     val accounts: List<Account> = emptyList(),
-    val categories: List<Category> = emptyList(),
     val tags: List<Tag> = emptyList(),
     val isSaved: Boolean = false,
     val isDeleted: Boolean = false,
@@ -45,12 +39,10 @@ data class AddEditTransactionUiState(
 class AddEditTransactionViewModel @Inject constructor(
     private val transactionRepository: TransactionRepository,
     private val accountRepository: AccountRepository,
-    private val categoryRepository: CategoryRepository,
     private val tagRepository: TagRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(AddEditTransactionUiState())
     val uiState: StateFlow<AddEditTransactionUiState> = _uiState.asStateFlow()
-    private var categoryJob: Job? = null
 
     init {
         loadData()
@@ -71,10 +63,6 @@ class AddEditTransactionViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            observeCategoriesFor(TransactionType.EXPENSE)
-        }
-
-        viewModelScope.launch {
             tagRepository.observeAll().collect { tags ->
                 _uiState.update { it.copy(tags = tags) }
             }
@@ -92,7 +80,6 @@ class AddEditTransactionViewModel @Inject constructor(
                         transactionType = tx.type,
                         amount = formatAmount(tx.amountMinor),
                         accountId = tx.accountId,
-                        categoryId = tx.categoryId,
                         counterpartyAccountId = tx.counterpartyAccountId,
                         description = tx.description ?: "",
                         notes = tx.notes ?: "",
@@ -106,7 +93,6 @@ class AddEditTransactionViewModel @Inject constructor(
 
     fun updateTransactionType(type: TransactionType) {
         _uiState.update { it.copy(transactionType = type) }
-        observeCategoriesFor(type)
     }
 
     fun updateAmount(amount: String) {
@@ -117,13 +103,8 @@ class AddEditTransactionViewModel @Inject constructor(
         _uiState.update { it.copy(accountId = accountId) }
     }
 
-    fun updateCategory(categoryId: Long) {
-        _uiState.update { it.copy(categoryId = categoryId, categoryManuallyChosen = true) }
-    }
-
     fun updateDescription(description: String) {
         _uiState.update { it.copy(description = description) }
-        suggestCategoryFor(description)
     }
 
     fun updateNotes(notes: String) {
@@ -133,49 +114,6 @@ class AddEditTransactionViewModel @Inject constructor(
     fun updateTransactionDate(date: LocalDate) {
         _uiState.update {
             it.copy(transactionTime = it.transactionTime.with(date))
-        }
-    }
-
-    fun acceptSuggestedCategory() {
-        val suggestion = _uiState.value.suggestedCategoryId ?: return
-        _uiState.update { it.copy(categoryId = suggestion, categoryManuallyChosen = true, suggestedCategoryId = null) }
-    }
-
-    fun dismissSuggestion() {
-        _uiState.update { it.copy(suggestedCategoryId = null) }
-    }
-
-    private fun suggestCategoryFor(description: String) {
-        val query = description.trim()
-        if (query.length < 3) {
-            _uiState.update { it.copy(suggestedCategoryId = null) }
-            return
-        }
-        viewModelScope.launch {
-            val all = transactionRepository.getAll()
-            val matches = all.filter { tx ->
-                val txDesc = tx.description?.trim().orEmpty()
-                txDesc.isNotEmpty() &&
-                    tx.type == _uiState.value.transactionType &&
-                    tx.categoryId != null &&
-                    tx.id != _uiState.value.transactionId &&
-                    (txDesc.equals(query, ignoreCase = true) ||
-                        txDesc.contains(query, ignoreCase = true) ||
-                        query.contains(txDesc, ignoreCase = true))
-            }
-            val topCategory = matches
-                .groupingBy { it.categoryId!! }
-                .eachCount()
-                .maxByOrNull { it.value }
-                ?.key
-
-            _uiState.update { state ->
-                val shouldAutoApply = !state.categoryManuallyChosen && state.categoryId == null && topCategory != null
-                state.copy(
-                    suggestedCategoryId = topCategory?.takeIf { it != state.categoryId },
-                    categoryId = if (shouldAutoApply) topCategory else state.categoryId
-                )
-            }
         }
     }
 
@@ -220,7 +158,6 @@ class AddEditTransactionViewModel @Inject constructor(
                 amountMinor = amountMinor,
                 transactionTime = state.transactionTime,
                 accountId = state.accountId,
-                categoryId = state.categoryId,
                 counterpartyAccountId = state.counterpartyAccountId,
                 description = state.description.takeIf { it.isNotEmpty() },
                 notes = state.notes.takeIf { it.isNotEmpty() },
@@ -261,20 +198,6 @@ class AddEditTransactionViewModel @Inject constructor(
             whole.toString()
         } else {
             "$whole.$fraction"
-        }
-    }
-
-    private fun observeCategoriesFor(type: TransactionType) {
-        categoryJob?.cancel()
-        categoryJob = viewModelScope.launch {
-            val categories = when (type) {
-                TransactionType.EXPENSE, TransactionType.REFUND -> categoryRepository.observeExpenseCategories()
-                TransactionType.INCOME -> categoryRepository.observeIncomeCategories()
-                TransactionType.TRANSFER -> categoryRepository.observeTree()
-            }
-            categories.collect { cats ->
-                _uiState.update { it.copy(categories = cats) }
-            }
         }
     }
 }

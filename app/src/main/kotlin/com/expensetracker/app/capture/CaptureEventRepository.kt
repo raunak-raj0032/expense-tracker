@@ -5,7 +5,6 @@ import android.provider.Telephony
 import com.expensetracker.app.core.data.repository.TransactionRepository
 import com.expensetracker.app.core.database.dao.AccountDao
 import com.expensetracker.app.core.database.dao.CaptureEventDao
-import com.expensetracker.app.core.database.dao.CategoryDao
 import com.expensetracker.app.core.database.dao.MerchantDao
 import com.expensetracker.app.core.database.entity.CaptureEventEntity
 import com.expensetracker.app.core.database.entity.MerchantEntity
@@ -30,7 +29,6 @@ class CaptureEventRepository @Inject constructor(
     private val captureEventDao: CaptureEventDao,
     private val transactionRepository: TransactionRepository,
     private val accountDao: AccountDao,
-    private val categoryDao: CategoryDao,
     private val merchantDao: MerchantDao,
     private val parserRegistry: NotificationParserRegistry
 ) {
@@ -174,8 +172,7 @@ class CaptureEventRepository @Inject constructor(
             }
         }
 
-        val categoryId = resolveCategoryId(direction, parseResult.categoryHint)
-        val merchantId = resolveMerchantId(parseResult.merchant ?: event.parsedMerchant, categoryId)
+        val merchantId = resolveMerchantId(parseResult.merchant ?: event.parsedMerchant)
         val accountId = resolveAccountId(
             paymentMethod = parseResult.paymentMethod,
             rawText = buildRawText(event)
@@ -186,7 +183,6 @@ class CaptureEventRepository @Inject constructor(
             amountMinor = amountMinor,
             transactionTime = event.receivedAt.toLocalDateTime(),
             accountId = accountId,
-            categoryId = categoryId,
             merchantId = merchantId,
             description = parseResult.description ?: defaultDescription(direction, parseResult.merchant ?: event.parsedMerchant),
             notes = buildNotes(event),
@@ -346,22 +342,7 @@ class CaptureEventRepository @Inject constructor(
         return preferred?.id ?: error("No active account available")
     }
 
-    private suspend fun resolveCategoryId(direction: TransactionType, categoryHint: String?): Long? {
-        if (categoryHint == null) {
-            return null
-        }
-
-        val normalizedHint = when (direction) {
-            TransactionType.EXPENSE,
-            TransactionType.INCOME -> categoryHint
-            TransactionType.TRANSFER,
-            TransactionType.REFUND -> "Transfer"
-        }
-
-        return categoryDao.findActiveByName(normalizedHint)?.id
-    }
-
-    private suspend fun resolveMerchantId(merchantName: String?, categoryId: Long?): Long? {
+    private suspend fun resolveMerchantId(merchantName: String?): Long? {
         if (merchantName.isNullOrBlank()) {
             return null
         }
@@ -373,8 +354,7 @@ class CaptureEventRepository @Inject constructor(
         val insertedId = merchantDao.insert(
             MerchantEntity(
                 canonicalName = merchantName,
-                normalizedKey = normalizedKey,
-                categoryHintId = categoryId
+                normalizedKey = normalizedKey
             )
         )
 

@@ -2,11 +2,9 @@ package com.expensetracker.app.ui.screens.analytics
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.expensetracker.app.core.data.repository.CategoryRepository
 import com.expensetracker.app.core.data.repository.TransactionRepository
 import com.expensetracker.app.core.domain.RecurringDetector
 import com.expensetracker.app.core.domain.RecurringSeries
-import com.expensetracker.app.core.model.CategoryBreakdown
 import com.expensetracker.app.core.model.MerchantBreakdown
 import com.expensetracker.app.ai.OnDeviceAiManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -45,7 +43,6 @@ data class AnalyticsUiState(
 @HiltViewModel
 class AnalyticsViewModel @Inject constructor(
     private val transactionRepository: TransactionRepository,
-    private val categoryRepository: CategoryRepository,
     private val aiManager: OnDeviceAiManager
 ) : ViewModel() {
 
@@ -79,15 +76,11 @@ class AnalyticsViewModel @Inject constructor(
                 .filter { it.categoryId > 0 }
                 .sortedByDescending { it.total }
                 .map { cat ->
-                    val category = categoryRepository.getById(cat.categoryId)
                     CategoryAnalytics(
                         categoryId = cat.categoryId,
                         categoryName = cat.categoryName,
                         total = cat.total,
-                        percentage = if (totalExpense > 0) (cat.total.toFloat() / totalExpense * 100) else 0f,
-                        color = category?.colorHex?.let { hex ->
-                            androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex))
-                        } ?: androidx.compose.ui.graphics.Color.Unspecified
+                        percentage = if (totalExpense > 0) (cat.total.toFloat() / totalExpense * 100) else 0f
                     )
                 }
 

@@ -1,0 +1,30 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.13/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Task :app:signingReport
+Variant: debug
+Config: debug
+Store: /root/.android/debug.keystore
+Alias: AndroidDebugKey
+MD5: 2C:8E:5B:A2:47:83:0C:31:27:A0:55:85:26:9B:CB:D5
+SHA1: 67:E2:A6:07:DF:80:43:92:0D:29:76:22:B5:27:31:2D:80:1B:A3:B8
+SHA-256: BD:ED:64:29:02:4B:8E:88:0D:86:79:96:EC:16:0D:BB:B8:A0:A3:79:B8:1E:98:8A:3C:59:B3:7C:0D:BF:C7:AB
+Valid until: Monday, April 24, 2056
+----------
+Variant: release
+Config: null
+Store: null
+Alias: null
+----------
+Variant: debugAndroidTest
+Config: debug
+Store: /root/.android/debug.keystore
+Alias: AndroidDebugKey
+MD5: 2C:8E:5B:A2:47:83:0C:31:27:A0:55:85:26:9B:CB:D5
+SHA1: 67:E2:A6:07:DF:80:43:92:0D:29:76:22:B5:27:31:2D:80:1B:A3:B8
+SHA-256: BD:ED:64:29:02:4B:8E:88:0D:86:79:96:EC:16:0D:BB:B8:A0:A3:79:B8:1E:98:8A:3C:59:B3:7C:0D:BF:C7:AB
+Valid until: Monday, April 24, 2056
+----------
+
+BUILD SUCCESSFUL in 12s
+1 actionable task: 1 executed

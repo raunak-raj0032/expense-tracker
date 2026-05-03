@@ -111,8 +111,8 @@ class BudgetGlanceWidget : GlanceAppWidget() {
                 .clickable(actionStartActivity<MainActivity>())
         ) {
             when {
-                size.height < 60.dp -> TinyLayout(period, hasBudget, spent, budget, ok, remaining, pctFloat)
-                size.height < 100.dp -> SmallLayout(period, hasBudget, spent, budget, ok, remaining, pctFloat, label)
+                size.height < 60.dp -> TinyLayout(period, hasBudget, ok, remaining)
+                size.height < 100.dp -> SmallLayout(period, hasBudget, ok, remaining, pctFloat)
                 else -> MediumLayout(period, hasBudget, spent, budget, ok, remaining, pctFloat, label)
             }
         }
@@ -121,8 +121,8 @@ class BudgetGlanceWidget : GlanceAppWidget() {
 
 @Composable
 private fun TinyLayout(
-    period: BudgetPeriod, hasBudget: Boolean, spent: Long, budget: Long,
-    ok: Boolean, remaining: Long, pctFloat: Float
+    period: BudgetPeriod, hasBudget: Boolean,
+    ok: Boolean, remaining: Long
 ) {
     Row(
         modifier = GlanceModifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -156,8 +156,8 @@ private fun TinyLayout(
 
 @Composable
 private fun SmallLayout(
-    period: BudgetPeriod, hasBudget: Boolean, spent: Long, budget: Long,
-    ok: Boolean, remaining: Long, pctFloat: Float, label: String
+    period: BudgetPeriod, hasBudget: Boolean,
+    ok: Boolean, remaining: Long, pctFloat: Float
 ) {
     Column(
         modifier = GlanceModifier.fillMaxSize().padding(14.dp)

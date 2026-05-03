@@ -139,13 +139,13 @@ class StatementImportParser @Inject constructor(
         val normalizedPassword = password?.takeIf { it.isNotBlank() }
 
         try {
-            val document = if (normalizedPassword == null) {
+            val pdfDocument = if (normalizedPassword == null) {
                 PDDocument.load(bytes)
             } else {
                 PDDocument.load(bytes, normalizedPassword)
             }
 
-            return document.use { document ->
+            return pdfDocument.use { document ->
                 val text = PDFTextStripper().apply {
                     setSortByPosition(true)
                     setShouldSeparateByBeads(false)
@@ -219,7 +219,6 @@ class StatementImportParser @Inject constructor(
             
             val draft = parseDelimitedRowFlexible(
                 headerNormalized = headerNormalized,
-                headerOriginal = header,
                 fields = fields,
                 sourceName = sourceName
             )
@@ -240,7 +239,6 @@ class StatementImportParser @Inject constructor(
 
     private fun parseDelimitedRowFlexible(
         headerNormalized: List<String>,
-        headerOriginal: List<String>,
         fields: List<String>,
         sourceName: String
     ): StatementImportDraft? {
@@ -255,7 +253,6 @@ class StatementImportParser @Inject constructor(
         
         val date = dateText?.let { findAndParseDate(it) } ?: return null
 
-        val amountFields = listOf("amount", "transactionamount", "txnamount", "debit", "withdrawal", "dr", "credit", "deposit", "cr", "amountdue", "payment")
         val descFields = listOf("description", "details", "narration", "particulars", "merchant", "remarks", "transactiondescription", "transactiondetails")
         val refFields = listOf("reference", "ref", "transactionid", "utr", "rrn", "txnid", "orderid")
 

@@ -404,13 +404,6 @@ fun MonthlySummaryCard(
         todayExpense > todayBudgetAllowance -> "Too fast"
         else -> "Steady"
     }
-    val paceSupporting = when {
-        todayBudgetAllowance == null || budgetTotal == null -> "Set a budget for daily pacing"
-        todayExpense == 0L -> "${formatAmount(todayBudgetAllowance)} available today"
-        todayExpense > todayBudgetAllowance -> "${formatAmount(todayExpense - todayBudgetAllowance)} over today"
-        else -> "${formatAmount(todayBudgetAllowance - todayExpense)} left today"
-    }
-
     // Hero card — dramatic net flow display
     GlassPanel(
         modifier = modifier.fillMaxWidth(),
