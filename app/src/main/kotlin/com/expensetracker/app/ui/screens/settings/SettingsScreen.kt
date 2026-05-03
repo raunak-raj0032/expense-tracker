@@ -1,10 +1,15 @@
 package com.expensetracker.app.ui.screens.settings
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings as AndroidSettings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -44,10 +49,12 @@ import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -59,6 +66,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,17 +80,22 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.ai.AiAvailability
 import com.expensetracker.app.ai.AiCompatibility
 import com.expensetracker.app.budget.BudgetPeriod
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import com.expensetracker.app.capture.requestCaptureNotificationRebind
 import com.expensetracker.app.core.money.CurrencyConverter
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.NeonPill
@@ -123,10 +136,45 @@ fun SettingsScreen(
     val budgetNotifPeriod by viewModel.budgetNotifPeriod.collectAsStateWithLifecycle()
     val aiEndpoint by viewModel.aiEndpoint.collectAsStateWithLifecycle()
     val aiModelName by viewModel.aiModelName.collectAsStateWithLifecycle()
+    val importingSms by viewModel.importingSms.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var showBatteryOptSheet by remember { mutableStateOf(false) }
+    var hasSmsPermission by remember { mutableStateOf(false) }
+    var notificationPermissionGranted by remember { mutableStateOf(true) }
+    var notificationAccessEnabled by remember { mutableStateOf(false) }
+    var accessibilityOn by remember { mutableStateOf(false) }
+
+    fun refreshCaptureStates() {
+        hasSmsPermission = hasSmsAccess(context)
+        notificationPermissionGranted = hasPostNotificationsAccess(context)
+        notificationAccessEnabled = hasNotificationListenerAccess(context)
+        accessibilityOn = hasAccessibilityAccess(context)
+        if (notificationAccessEnabled) {
+            requestCaptureNotificationRebind(context)
+        }
+    }
+
+    val smsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { refreshCaptureStates() }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { refreshCaptureStates() }
 
     LaunchedEffect(Unit) { delay(60); visible = true }
+
+    LaunchedEffect(Unit) { refreshCaptureStates() }
+
+    DisposableEffect(lifecycleOwner, context) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshCaptureStates()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     fun showPrototypeMessage(title: String) {
         scope.launch { snackbarHostState.showSnackbar("$title is not available in this build yet.") }
@@ -212,43 +260,41 @@ fun SettingsScreen(
             // Automation
             item { SettingsSectionLabel("Automation") }
             item {
-                SettingsItem(
-                    icon     = Icons.Default.Notifications,
-                    title    = "SMS & Notification Capture",
-                    subtitle = "Parse UPI, bank, and payment messages",
-                    accent   = MaterialTheme.colorScheme.tertiary,
-                    badge    = "Live",
-                    modifier = Modifier.testTag("settings_capture_inbox"),
-                    onClick  = onOpenCaptureInbox
-                )
-            }
-            item {
-                val accessibilityOn = hasAccessibilityAccess(context)
-                SettingsItem(
-                    icon     = Icons.Default.PhoneAndroid,
-                    title    = "UPI app capture",
-                    subtitle = "Detect payments on PhonePe, GPay, Paytm & more as you make them. You confirm each one.",
-                    accent   = MaterialTheme.colorScheme.tertiary,
-                    badge    = if (accessibilityOn) "On" else "Off",
-                    onClick  = {
-                        if (!accessibilityOn) {
-                            context.startActivity(
-                                Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS)
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                CaptureSettingsCard(
+                    hasSmsPermission = hasSmsPermission,
+                    notificationPermissionGranted = notificationPermissionGranted,
+                    notificationAccessEnabled = notificationAccessEnabled,
+                    accessibilityOn = accessibilityOn,
+                    batteryOptimized = accessibilityOn && !isBatteryOptimizationIgnored(context),
+                    importingSms = importingSms,
+                    onGrantSmsAccess = {
+                        smsPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.READ_SMS,
+                                Manifest.permission.RECEIVE_SMS
                             )
-                        } else if (!isBatteryOptimizationIgnored(context)) {
-                            showBatteryOptSheet = true
-                        } else {
-                            context.startActivity(
-                                Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS)
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            )
+                        )
+                    },
+                    onRequestNotificationPermission = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
-                    }
+                    },
+                    onOpenNotificationSettings = {
+                        context.startActivity(Intent(AndroidSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    },
+                    onOpenAccessibilitySettings = {
+                        context.startActivity(
+                            Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    },
+                    onOpenBatterySettings = { showBatteryOptSheet = true },
+                    onScanRecentSms = { viewModel.importRecentSms() },
+                    onOpenInbox = onOpenCaptureInbox
                 )
             }
             item { SettingsItem(Icons.AutoMirrored.Filled.Rule, "Rules",       "Automation rules",                  accent = MaterialTheme.colorScheme.tertiary) { showPrototypeMessage("Rules") } }
-            item { SettingsItem(Icons.Default.Receipt,           "Suggestions", "Review inferred transactions",      accent = MaterialTheme.colorScheme.tertiary, onClick = onOpenCaptureInbox) }
 
             // On-device AI
             item { SettingsSectionLabel("On-device AI") }
@@ -570,6 +616,139 @@ fun SettingsToggleItem(
 }
 
 @Composable
+private fun CaptureSettingsCard(
+    hasSmsPermission: Boolean,
+    notificationPermissionGranted: Boolean,
+    notificationAccessEnabled: Boolean,
+    accessibilityOn: Boolean,
+    batteryOptimized: Boolean,
+    importingSms: Boolean,
+    onGrantSmsAccess: () -> Unit,
+    onRequestNotificationPermission: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
+    onOpenBatterySettings: () -> Unit,
+    onScanRecentSms: () -> Unit,
+    onOpenInbox: () -> Unit
+) {
+    GlassPanel(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("settings_capture_inbox"),
+        accent = MaterialTheme.colorScheme.tertiary
+    ) {
+        SectionHeader(
+            eyebrow = "Smart capture",
+            title = "Capture modes live here",
+            subtitle = "Turn SMS, notification, and UPI screen capture on from Settings. The home shortcut only opens the review inbox."
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            CaptureModeRow(
+                icon = Icons.Default.Receipt,
+                title = "SMS messages",
+                status = if (hasSmsPermission) "On" else "Off",
+                detail = "Reads bank and UPI SMS alerts for reviewable suggestions.",
+                accent = MaterialTheme.colorScheme.secondary
+            )
+            CaptureModeRow(
+                icon = Icons.Default.Notifications,
+                title = "App notifications",
+                status = if (notificationAccessEnabled && notificationPermissionGranted) "On" else "Off",
+                detail = "Reads payment notifications and can alert you when new captures are ready.",
+                accent = MaterialTheme.colorScheme.tertiary
+            )
+            CaptureModeRow(
+                icon = Icons.Default.PhoneAndroid,
+                title = "UPI screens",
+                status = if (accessibilityOn) "On" else "Off",
+                detail = "Detects successful payments inside GPay, PhonePe, Paytm, BHIM, and other UPI apps.",
+                accent = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = onGrantSmsAccess,
+                modifier = Modifier.weight(1f)
+            ) { Text(if (hasSmsPermission) "Refresh SMS" else "Enable SMS") }
+            Button(
+                onClick = onScanRecentSms,
+                enabled = hasSmsPermission && !importingSms,
+                modifier = Modifier.weight(1f)
+            ) { Text(if (importingSms) "Scanning..." else "Scan SMS") }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = onOpenNotificationSettings,
+                modifier = Modifier.weight(1f)
+            ) { Text("Notification listener") }
+            OutlinedButton(
+                onClick = onOpenAccessibilitySettings,
+                modifier = Modifier.weight(1f)
+            ) { Text("UPI screen capture") }
+        }
+
+        if (!notificationPermissionGranted || batteryOptimized) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!notificationPermissionGranted) {
+                    OutlinedButton(
+                        onClick = onRequestNotificationPermission,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Allow alerts") }
+                }
+                if (batteryOptimized) {
+                    OutlinedButton(
+                        onClick = onOpenBatterySettings,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Keep alive") }
+                }
+            }
+        }
+
+        Button(
+            onClick = onOpenInbox,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Open captured payments") }
+    }
+}
+
+@Composable
+private fun CaptureModeRow(
+    icon: ImageVector,
+    title: String,
+    status: String,
+    detail: String,
+    accent: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(accent.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        NeonPill(text = status, accent = if (status == "On") accent else MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
 fun SettingsItem(
     icon: ImageVector,
     title: String,
@@ -776,6 +955,34 @@ private fun formatBytes(bytes: Long): String {
 private fun isBatteryOptimizationIgnored(context: Context): Boolean {
     val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return true
     return pm.isIgnoringBatteryOptimizations(context.packageName)
+}
+
+private fun hasSmsAccess(context: Context): Boolean {
+    val readGranted = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.READ_SMS
+    ) == PackageManager.PERMISSION_GRANTED
+    val receiveGranted = ContextCompat.checkSelfPermission(
+        context,
+        Manifest.permission.RECEIVE_SMS
+    ) == PackageManager.PERMISSION_GRANTED
+    return readGranted && receiveGranted
+}
+
+private fun hasPostNotificationsAccess(context: Context): Boolean {
+    return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+}
+
+private fun hasNotificationListenerAccess(context: Context): Boolean {
+    val enabledListeners = AndroidSettings.Secure.getString(
+        context.contentResolver,
+        "enabled_notification_listeners"
+    ).orEmpty()
+    return enabledListeners.contains(context.packageName)
 }
 
 private fun hasAccessibilityAccess(context: Context): Boolean {

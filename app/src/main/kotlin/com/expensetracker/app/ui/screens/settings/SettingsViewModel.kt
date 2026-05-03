@@ -8,6 +8,7 @@ import com.expensetracker.app.ai.AiAvailability
 import com.expensetracker.app.ai.OnDeviceAiManager
 import com.expensetracker.app.budget.BudgetNotificationService
 import com.expensetracker.app.budget.BudgetPeriod
+import com.expensetracker.app.capture.CaptureEventRepository
 import com.expensetracker.app.core.data.repository.AppDataRepository
 import com.expensetracker.app.core.prefs.DEFAULT_AI_MODEL_NAME
 import com.expensetracker.app.core.prefs.UserPreferences
@@ -27,6 +28,7 @@ class SettingsViewModel @Inject constructor(
     private val appDataRepository: AppDataRepository,
     private val userPreferences: UserPreferences,
     private val onDeviceAiManager: OnDeviceAiManager,
+    private val captureEventRepository: CaptureEventRepository,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -122,6 +124,29 @@ class SettingsViewModel @Inject constructor(
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
+
+    private val _importingSms = MutableStateFlow(false)
+    val importingSms: StateFlow<Boolean> = _importingSms.asStateFlow()
+
+    fun importRecentSms(limit: Int = 50) {
+        if (_importingSms.value) return
+        _importingSms.value = true
+        viewModelScope.launch {
+            _message.value = try {
+                val imported = captureEventRepository.importRecentSms(limit)
+                if (imported > 0) {
+                    "Added $imported SMS suggestion(s) for review."
+                } else {
+                    "No new payment SMS messages were found."
+                }
+            } catch (e: SecurityException) {
+                "SMS access is required before scanning messages."
+            } catch (e: Exception) {
+                e.message ?: "Unable to scan SMS history right now."
+            }
+            _importingSms.value = false
+        }
+    }
 
     fun setBiometricEnabled(enabled: Boolean) {
         viewModelScope.launch {

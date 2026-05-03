@@ -2,14 +2,6 @@
 
 package com.expensetracker.app.ui.screens.capture
 
-import android.Manifest
-import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -30,52 +22,38 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.MarkEmailRead
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.foundation.text.KeyboardOptions
 import com.expensetracker.app.capture.CaptureSuggestion
-import com.expensetracker.app.capture.requestCaptureNotificationRebind
+import com.expensetracker.app.core.model.CaptureSourceType
 import com.expensetracker.app.ui.screens.home.formatAmount
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
-import com.expensetracker.app.ui.theme.SectionHeader
 import com.expensetracker.app.ui.theme.adaptiveFlowLayout
 import com.expensetracker.app.ui.theme.appButtonSizing
 import java.time.format.DateTimeFormatter
@@ -87,37 +65,7 @@ fun CaptureReviewScreen(
     viewModel: CaptureReviewViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }
-    var hasSmsPermission by remember { mutableStateOf(hasSmsAccess(context)) }
-    var notificationAccessEnabled by remember { mutableStateOf(hasNotificationAccess(context)) }
-    var showImportDialog by remember { mutableStateOf(false) }
-    var importLimitInput by remember { mutableStateOf("50") }
-    var importLimitError by remember { mutableStateOf<String?>(null) }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        hasSmsPermission = hasSmsAccess(context)
-    }
-
-    DisposableEffect(lifecycleOwner, context) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                hasSmsPermission = hasSmsAccess(context)
-                notificationAccessEnabled = hasNotificationAccess(context)
-                if (notificationAccessEnabled) {
-                    requestCaptureNotificationRebind(context)
-                }
-            }
-        }
-
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
 
     LaunchedEffect(uiState.message) {
         uiState.message?.let { message ->
@@ -135,7 +83,7 @@ fun CaptureReviewScreen(
                     Column {
                         Text("Capture Inbox")
                         Text(
-                            text = "Review parsed payments before importing",
+                            text = "Captured from SMS, notifications, and UPI screens",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -165,29 +113,6 @@ fun CaptureReviewScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                CaptureAccessCard(
-                    hasSmsPermission = hasSmsPermission,
-                    notificationAccessEnabled = notificationAccessEnabled,
-                    isImportingSms = uiState.isImportingSms,
-                    onGrantSmsAccess = {
-                        permissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.READ_SMS,
-                                Manifest.permission.RECEIVE_SMS
-                            )
-                        )
-                    },
-                    onImportRecentSms = {
-                        importLimitError = null
-                        showImportDialog = true
-                    },
-                    onOpenNotificationSettings = {
-                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                    }
-                )
-            }
-
             if (uiState.suggestions.isEmpty()) {
                 item {
                     EmptyCaptureState()
@@ -202,193 +127,6 @@ fun CaptureReviewScreen(
                     )
                 }
             }
-        }
-    }
-
-    if (showImportDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                if (!uiState.isImportingSms) {
-                    showImportDialog = false
-                    importLimitError = null
-                }
-            },
-            title = { Text("Import recent SMS") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "How many of your latest messages should Smart Capture scan for transactions?",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf("25", "50", "100").forEach { option ->
-                            FilterChip(
-                                selected = importLimitInput == option,
-                                onClick = {
-                                    importLimitInput = option
-                                    importLimitError = null
-                                },
-                                label = { Text("$option latest") }
-                            )
-                        }
-                    }
-                    OutlinedTextField(
-                        value = importLimitInput,
-                        onValueChange = { input ->
-                            if (input.isEmpty() || input.all(Char::isDigit)) {
-                                importLimitInput = input
-                                importLimitError = null
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("capture_import_sms_limit_input"),
-                        label = { Text("Messages to scan") },
-                        placeholder = { Text("50") },
-                        singleLine = true,
-                        isError = importLimitError != null,
-                        supportingText = {
-                            Text(importLimitError ?: "Start with the latest alerts to keep imports fast and relevant.")
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val limit = importLimitInput.toIntOrNull()
-                        if (limit == null || limit <= 0) {
-                            importLimitError = "Enter a number greater than 0."
-                            return@TextButton
-                        }
-                        showImportDialog = false
-                        viewModel.importRecentSms(limit)
-                    },
-                    enabled = !uiState.isImportingSms
-                ) {
-                    Text(if (uiState.isImportingSms) "Importing..." else "Import")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showImportDialog = false
-                        importLimitError = null
-                    },
-                    enabled = !uiState.isImportingSms
-                ) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-}
-
-@Composable
-private fun CaptureAccessCard(
-    hasSmsPermission: Boolean,
-    notificationAccessEnabled: Boolean,
-    isImportingSms: Boolean,
-    onGrantSmsAccess: () -> Unit,
-    onImportRecentSms: () -> Unit,
-    onOpenNotificationSettings: () -> Unit
-) {
-    GlassPanel(
-        modifier = Modifier.fillMaxWidth(),
-        accent = MaterialTheme.colorScheme.primary
-    ) {
-        SectionHeader(
-            eyebrow = "Capture",
-            title = if (hasSmsPermission) "SMS import is ready" else "Allow SMS access to get started",
-            subtitle = "Choose how many recent bank, UPI, and shopping messages to scan, then keep new captures flowing through notifications."
-        )
-
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                StatusTile(
-                    icon = Icons.Default.MarkEmailRead,
-                    label = "SMS access",
-                    value = if (hasSmsPermission) "Ready" else "Required",
-                    modifier = Modifier.weight(1f)
-                )
-                StatusTile(
-                    icon = Icons.Default.Notifications,
-                    label = "Listener",
-                    value = if (notificationAccessEnabled) "Enabled" else "Optional",
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onGrantSmsAccess,
-                    modifier = Modifier
-                        .weight(1f)
-                        .appButtonSizing()
-                        .testTag("capture_request_sms_button")
-                ) {
-                    Text(if (hasSmsPermission) "Refresh Access" else "Grant Access")
-                }
-                Button(
-                    onClick = onImportRecentSms,
-                    enabled = hasSmsPermission && !isImportingSms,
-                    modifier = Modifier
-                        .weight(1f)
-                        .appButtonSizing()
-                        .testTag("capture_import_sms_button")
-                ) {
-                    Text(if (isImportingSms) "Importing..." else "Scan Recent SMS")
-                }
-            }
-        }
-
-        OutlinedButton(
-            onClick = onOpenNotificationSettings,
-            modifier = Modifier
-                .fillMaxWidth()
-                .appButtonSizing()
-        ) {
-            Text(if (notificationAccessEnabled) "Manage Notification Access" else "Enable Notification Access")
-        }
-    }
-}
-
-@Composable
-private fun StatusTile(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = label, style = MaterialTheme.typography.bodySmall)
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.secondary
-            )
         }
     }
 }
@@ -438,6 +176,8 @@ private fun CaptureSuggestionCard(
                         fontWeight = FontWeight.Bold
                     )
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+                SourceBadge(sourceType = suggestion.sourceType)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "${suggestion.sourceLabel} | $timestamp",
@@ -524,6 +264,34 @@ private fun CaptureSuggestionCard(
 }
 
 @Composable
+private fun SourceBadge(sourceType: CaptureSourceType) {
+    val (label, icon, accent) = when (sourceType) {
+        CaptureSourceType.SMS -> Triple("SMS message", Icons.Default.MarkEmailRead, MaterialTheme.colorScheme.secondary)
+        CaptureSourceType.ACCESSIBILITY -> Triple("UPI screen", Icons.Default.PhoneAndroid, MaterialTheme.colorScheme.primary)
+        CaptureSourceType.NOTIFICATION -> Triple("Notification", Icons.Default.Notifications, MaterialTheme.colorScheme.tertiary)
+        else -> Triple(sourceType.name.lowercase().replaceFirstChar(Char::uppercase), Icons.Default.Stars, MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    Surface(
+        shape = CircleShape,
+        color = accent.copy(alpha = 0.14f),
+        contentColor = accent
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(14.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
 private fun EmptyCaptureState() {
     GlassPanel(
         modifier = Modifier.fillMaxWidth(),
@@ -550,30 +318,10 @@ private fun EmptyCaptureState() {
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = "Import recent SMS or enable notification access to start reviewing inferred transactions.",
+                text = "Captured SMS, notification, and UPI screen payments will appear here. Manage capture modes from Settings.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
-}
-
-private fun hasSmsAccess(context: Context): Boolean {
-    val readGranted = ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.READ_SMS
-    ) == PackageManager.PERMISSION_GRANTED
-    val receiveGranted = ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.RECEIVE_SMS
-    ) == PackageManager.PERMISSION_GRANTED
-    return readGranted && receiveGranted
-}
-
-private fun hasNotificationAccess(context: Context): Boolean {
-    val enabledListeners = Settings.Secure.getString(
-        context.contentResolver,
-        "enabled_notification_listeners"
-    ).orEmpty()
-    return enabledListeners.contains(context.packageName)
 }

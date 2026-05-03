@@ -1,6 +1,7 @@
 package com.expensetracker.app.capture
 
 import com.expensetracker.app.core.model.TransactionType
+import com.expensetracker.app.core.model.CaptureSourceType
 import java.time.LocalDateTime
 
 data class CaptureSuggestion(
@@ -12,6 +13,7 @@ data class CaptureSuggestion(
     val paymentMethod: String?,
     val categoryHint: String?,
     val reference: String?,
+    val sourceType: CaptureSourceType,
     val sourceLabel: String,
     val rawPreview: String,
     val confidence: Float,

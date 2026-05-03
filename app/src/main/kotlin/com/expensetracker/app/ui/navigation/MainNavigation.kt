@@ -120,7 +120,8 @@ private val bottomNavItems = listOf(
 @Composable
 fun MainNavigation(
     darkThemeEnabled: Boolean,
-    onDarkThemeChange: (Boolean) -> Unit
+    onDarkThemeChange: (Boolean) -> Unit,
+    captureInboxRequest: Int = 0
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -157,6 +158,12 @@ fun MainNavigation(
                 popUpTo(0) { inclusive = true }
                 launchSingleTop = true
             }
+        }
+    }
+
+    LaunchedEffect(captureInboxRequest, authState) {
+        if (captureInboxRequest > 0 && authState is AuthState.SignedIn && currentDestination?.route != Screen.CaptureInbox.route) {
+            navController.navigate(Screen.CaptureInbox.route) { launchSingleTop = true }
         }
     }
 

@@ -450,6 +450,8 @@ class PaymentMessageParser @Inject constructor() {
             "com.google.android.apps.nbu.paisa.user",
             "com.google.android.apps.nbu.paisa.provider",
             "com.phonepe.app",
+            "com.phonepe.app.preprod",
+            "net.one97.paytm",
             "com.paytm.app",
             "in.org.npci.bhimapp",
             "com.dreamplug.androidapp",

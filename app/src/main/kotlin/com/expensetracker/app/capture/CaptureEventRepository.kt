@@ -56,7 +56,8 @@ class CaptureEventRepository @Inject constructor(
             text = text,
             subtext = subtext,
             receivedAt = receivedAt,
-            parseResult = parseResult
+            parseResult = parseResult,
+            autoImportEligible = false
         ).eventId > 0L
     }
 
@@ -86,7 +87,7 @@ class CaptureEventRepository @Inject constructor(
             subtext = null,
             receivedAt = receivedAt,
             parseResult = parseResult,
-            trustPeerTransfer = true
+            autoImportEligible = false
         )
         android.util.Log.d(
             "UpiCapture",
@@ -210,6 +211,7 @@ class CaptureEventRepository @Inject constructor(
         subtext: String?,
         receivedAt: Long,
         parseResult: ParseResult,
+        autoImportEligible: Boolean = true,
         trustPeerTransfer: Boolean = false
     ): StoreOutcome {
         if (!parseResult.isTransaction || parseResult.fingerprint == null) {
@@ -263,6 +265,7 @@ class CaptureEventRepository @Inject constructor(
 
         var autoImported = false
         if (eventId > 0L
+            && autoImportEligible
             && sourceType != CaptureSourceType.SMS
             && entity.parseStatus == ParseStatus.SUCCESS.name
             && (trustPeerTransfer || !parseResult.isPeerTransfer)
@@ -290,6 +293,7 @@ class CaptureEventRepository @Inject constructor(
             paymentMethod = parseResult.paymentMethod,
             categoryHint = parseResult.categoryHint,
             reference = event.parsedReference ?: parseResult.reference,
+            sourceType = CaptureSourceType.valueOf(event.sourceType),
             sourceLabel = sourceLabel(event),
             rawPreview = event.rawText.orEmpty().trim().take(180),
             confidence = event.confidenceScore.takeIf { it > 0f } ?: parseResult.confidence,
@@ -417,6 +421,8 @@ class CaptureEventRepository @Inject constructor(
             "com.google.android.apps.nbu.paisa.user" to "Google Pay",
             "com.google.android.apps.nbu.paisa.provider" to "Google Pay",
             "com.phonepe.app" to "PhonePe",
+            "com.phonepe.app.preprod" to "PhonePe",
+            "net.one97.paytm" to "Paytm",
             "com.paytm.app" to "Paytm",
             "in.org.npci.bhimapp" to "BHIM",
             "com.dreamplug.androidapp" to "CRED",

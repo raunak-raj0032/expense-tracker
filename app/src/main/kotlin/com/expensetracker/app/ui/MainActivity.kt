@@ -1,6 +1,7 @@
 package com.expensetracker.app.ui
 
 import android.os.Bundle
+import android.content.Intent
 import androidx.activity.compose.setContent
 import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,8 +19,11 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
+    private var captureInboxRequest by mutableStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        recordCaptureInboxRequest(intent)
         setContent {
             var darkThemeEnabled by rememberSaveable { mutableStateOf(true) }
 
@@ -31,11 +35,24 @@ class MainActivity : FragmentActivity() {
                     BiometricGate {
                         MainNavigation(
                             darkThemeEnabled = darkThemeEnabled,
-                            onDarkThemeChange = { darkThemeEnabled = it }
+                            onDarkThemeChange = { darkThemeEnabled = it },
+                            captureInboxRequest = captureInboxRequest
                         )
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        recordCaptureInboxRequest(intent)
+    }
+
+    private fun recordCaptureInboxRequest(intent: Intent?) {
+        if (intent?.hasExtra("capture_event_id") == true) {
+            captureInboxRequest += 1
         }
     }
 }
