@@ -1,5 +1,7 @@
 package com.expensetracker.app.ui.screens.home
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expensetracker.app.capture.CaptureEventRepository
@@ -7,13 +9,19 @@ import com.expensetracker.app.core.data.repository.BudgetRepository
 import com.expensetracker.app.core.data.repository.TransactionRepository
 import com.expensetracker.app.core.model.Transaction
 import com.expensetracker.app.core.model.TransactionType
+import com.expensetracker.app.core.prefs.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -36,6 +44,7 @@ data class HomeUiState(
     val daysInMonth: Int = 30,
     val netFlow: Long = 0,
     val openCaptureCount: Int = 0,
+    val profilePicturePath: String = "",
     val isLoading: Boolean = false,
     val selectedTransactionIds: Set<Long> = emptySet()
 ) {
@@ -44,9 +53,11 @@ data class HomeUiState(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val transactionRepository: TransactionRepository,
     private val budgetRepository: BudgetRepository,
-    private val captureEventRepository: CaptureEventRepository
+    private val captureEventRepository: CaptureEventRepository,
+    private val userPreferences: UserPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -54,6 +65,56 @@ class HomeViewModel @Inject constructor(
 
     init {
         loadData()
+        loadProfilePicture()
+    }
+
+    private fun loadProfilePicture() {
+        viewModelScope.launch {
+            userPreferences.profilePicturePath.collect { path ->
+                _uiState.update { it.copy(profilePicturePath = path) }
+            }
+        }
+    }
+
+    fun setProfilePictureUri(uri: Uri, onComplete: (String?) -> Unit) {
+        viewModelScope.launch {
+            val path = saveProfilePicture(uri)
+            withContext(Dispatchers.Main) {
+                onComplete(path)
+            }
+        }
+    }
+
+    private suspend fun saveProfilePicture(uri: Uri): String? = withContext(Dispatchers.IO) {
+        try {
+            val profileDir = File(context.filesDir, "profile_pictures")
+            if (!profileDir.exists()) {
+                profileDir.mkdirs()
+            }
+
+            val previousPathValue = _uiState.value.profilePicturePath
+            if (previousPathValue.isNotEmpty()) {
+                val previousFile = File(previousPathValue)
+                if (previousFile.exists()) {
+                    previousFile.delete()
+                }
+            }
+
+            val newFile = File(profileDir, "profile_${System.currentTimeMillis()}.jpg")
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(newFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            newFile.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    fun setProfilePicturePath(path: String) {
+        viewModelScope.launch { userPreferences.setProfilePicturePath(path) }
     }
 
     private fun loadData() {

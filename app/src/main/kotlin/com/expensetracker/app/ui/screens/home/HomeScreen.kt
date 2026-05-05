@@ -68,8 +68,10 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,10 +80,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.expensetracker.app.auth.AuthState
 import com.expensetracker.app.auth.AuthViewModel
 import com.expensetracker.app.core.model.Transaction
@@ -102,6 +106,11 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+import android.net.Uri
+import android.os.Environment
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -119,9 +128,40 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val authState by authViewModel.authState.collectAsStateWithLifecycle()
     val firstName = (authState as? AuthState.SignedIn)?.user?.firstName.orEmpty()
+    val profilePicturePath = uiState.profilePicturePath
     var visible by remember { mutableStateOf(false) }
     var showBulkDeleteDialog by remember { mutableStateOf(false) }
+    var showProfilePicker by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { delay(80); visible = true }
+
+    val context = LocalContext.current
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.setProfilePictureUri(it) { path ->
+                path?.let { viewModel.setProfilePicturePath(it) }
+            }
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+    }
+
+    fun takePhoto() {
+        val photoFile = java.io.File(
+            context.getExternalFilesDir(Environment.DIRECTORY_PICTURES),
+            "profile_${System.currentTimeMillis()}.jpg"
+        )
+        cameraLauncher.launch(Uri.fromFile(photoFile))
+    }
+
+    fun pickImage() {
+        imagePickerLauncher.launch("image/*")
+    }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -187,12 +227,30 @@ fun HomeScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                     }
-                    IconButton(onClick = onOpenProfile) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "Profile",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    IconButton(onClick = { showProfilePicker = true }) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (profilePicturePath.isNotEmpty() && java.io.File(profilePicturePath).exists()) {
+                                AsyncImage(
+                                    model = java.io.File(profilePicturePath),
+                                    contentDescription = "Profile",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Profile",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
                     }
                 }
             )
@@ -367,6 +425,54 @@ fun HomeScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showBulkDeleteDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showProfilePicker) {
+        AlertDialog(
+            onDismissRequest = { showProfilePicker = false },
+            title = { Text("Change Profile Photo") },
+            text = {
+                Column {
+                    TextButton(
+                        onClick = {
+                            showProfilePicker = false
+                            takePhoto()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.CameraAlt, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Take Photo")
+                    }
+                    TextButton(
+                        onClick = {
+                            showProfilePicker = false
+                            pickImage()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Person, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Choose from Gallery")
+                    }
+                    TextButton(
+                        onClick = {
+                            showProfilePicker = false
+                            onOpenProfile()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Person, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Edit Full Profile")
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showProfilePicker = false }) { Text("Cancel") }
             }
         )
     }
