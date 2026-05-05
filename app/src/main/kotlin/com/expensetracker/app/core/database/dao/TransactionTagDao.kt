@@ -9,6 +9,12 @@ interface TransactionTagDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(join: TransactionTagEntity)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIgnore(joins: List<TransactionTagEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllReplace(joins: List<TransactionTagEntity>)
+
     @Delete
     suspend fun delete(join: TransactionTagEntity)
 
@@ -20,4 +26,7 @@ interface TransactionTagDao {
 
     @Query("DELETE FROM transaction_tags WHERE transactionId = :transactionId")
     suspend fun deleteAllForTransaction(transactionId: Long)
+
+    @Query("SELECT * FROM transaction_tags ORDER BY transactionId ASC, tagId ASC")
+    suspend fun getAllForBackup(): List<TransactionTagEntity>
 }

@@ -83,6 +83,7 @@ import com.expensetracker.app.ui.screens.login.EmailAuthScreen
 import com.expensetracker.app.ui.screens.login.LoginScreen
 import com.expensetracker.app.ui.screens.onboarding.OnboardingScreen
 import com.expensetracker.app.ui.screens.profile.ProfileScreen
+import com.expensetracker.app.ui.screens.backup.BackupScreen
 import com.expensetracker.app.ui.screens.budget.BudgetSetupScreen
 import com.expensetracker.app.ui.screens.analytics.AnalyticsScreen
 import com.expensetracker.app.ui.screens.calendar.CalendarScreen
@@ -280,6 +281,7 @@ fun MainNavigation(
                         onOpenCaptureInbox    = { navController.navigate(Screen.CaptureInbox.route) },
                         onOpenBudget          = { navController.navigate(Screen.Budgets.route) },
                         onOpenStatementImport = { navController.navigate(Screen.Import.route) },
+                        onOpenBackup          = { navController.navigate(Screen.Backup.route) },
                         onOpenTags            = { navController.navigate(Screen.Tags.route) },
                         onReplayTutorial      = {
                             gateViewModel.replayTutorial()
@@ -304,6 +306,9 @@ fun MainNavigation(
                 }
                 composable(Screen.Import.route) {
                     StatementImportScreen(onNavigateBack = { navController.popBackStack() })
+                }
+                composable(Screen.Backup.route) {
+                    BackupScreen(onNavigateBack = { navController.popBackStack() })
                 }
                 composable(Screen.AddTransaction.route) {
                     AddEditTransactionScreen(

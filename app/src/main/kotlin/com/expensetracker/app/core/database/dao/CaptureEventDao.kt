@@ -13,6 +13,12 @@ interface CaptureEventDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(event: CaptureEventEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIgnore(events: List<CaptureEventEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllReplace(events: List<CaptureEventEntity>)
+
     @Update
     suspend fun update(event: CaptureEventEntity)
 
@@ -39,6 +45,9 @@ interface CaptureEventDao {
 
     @Query("SELECT * FROM capture_events WHERE id = :eventId LIMIT 1")
     suspend fun getById(eventId: Long): CaptureEventEntity?
+
+    @Query("SELECT * FROM capture_events ORDER BY id ASC")
+    suspend fun getAllForBackup(): List<CaptureEventEntity>
 
     @Query("SELECT * FROM capture_events WHERE fingerprintHash = :hash LIMIT 1")
     suspend fun findDuplicate(hash: String): CaptureEventEntity?

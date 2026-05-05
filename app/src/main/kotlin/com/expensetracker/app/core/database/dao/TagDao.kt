@@ -9,6 +9,12 @@ interface TagDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(tag: TagEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIgnore(tags: List<TagEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllReplace(tags: List<TagEntity>)
+
     @Update
     suspend fun update(tag: TagEntity)
 
@@ -20,6 +26,9 @@ interface TagDao {
 
     @Query("SELECT * FROM tags WHERE id = :id")
     suspend fun getById(id: Long): TagEntity?
+
+    @Query("SELECT * FROM tags ORDER BY id ASC")
+    suspend fun getAllForBackup(): List<TagEntity>
 
     @Query("SELECT COUNT(*) FROM tags")
     suspend fun getCount(): Int

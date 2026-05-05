@@ -9,6 +9,12 @@ interface TransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(transaction: TransactionEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIgnore(transactions: List<TransactionEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllReplace(transactions: List<TransactionEntity>)
+
     @Update
     suspend fun update(transaction: TransactionEntity)
 
@@ -26,6 +32,9 @@ interface TransactionDao {
 
     @Query("SELECT * FROM transactions WHERE deletedAt IS NULL ORDER BY transactionTime DESC")
     suspend fun getAll(): List<TransactionEntity>
+
+    @Query("SELECT * FROM transactions ORDER BY id ASC")
+    suspend fun getAllForBackup(): List<TransactionEntity>
 
     @Query("SELECT * FROM transactions WHERE deletedAt IS NULL AND accountId = :accountId ORDER BY transactionTime DESC")
     fun observeByAccount(accountId: Long): Flow<List<TransactionEntity>>

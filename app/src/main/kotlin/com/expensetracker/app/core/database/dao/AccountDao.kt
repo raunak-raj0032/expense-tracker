@@ -9,6 +9,12 @@ interface AccountDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(account: AccountEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIgnore(accounts: List<AccountEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllReplace(accounts: List<AccountEntity>)
+
     @Update
     suspend fun update(account: AccountEntity)
 
@@ -26,6 +32,9 @@ interface AccountDao {
 
     @Query("SELECT * FROM accounts WHERE isArchived = 0 ORDER BY name ASC")
     suspend fun getAllActive(): List<AccountEntity>
+
+    @Query("SELECT * FROM accounts ORDER BY id ASC")
+    suspend fun getAllForBackup(): List<AccountEntity>
 
     @Query("SELECT COUNT(*) FROM accounts")
     suspend fun getCount(): Int

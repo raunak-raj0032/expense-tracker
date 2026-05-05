@@ -13,6 +13,12 @@ interface BudgetDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(budget: BudgetEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIgnore(budgets: List<BudgetEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllReplace(budgets: List<BudgetEntity>)
+
     @Update
     suspend fun update(budget: BudgetEntity)
 
@@ -27,6 +33,9 @@ interface BudgetDao {
 
     @Query("SELECT * FROM budgets WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): BudgetEntity?
+
+    @Query("SELECT * FROM budgets ORDER BY id ASC")
+    suspend fun getAllForBackup(): List<BudgetEntity>
 
     @Query("UPDATE budgets SET isEnabled = 0 WHERE id = :id")
     suspend fun disable(id: Long)

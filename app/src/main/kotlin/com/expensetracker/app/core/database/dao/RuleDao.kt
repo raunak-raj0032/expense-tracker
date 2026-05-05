@@ -9,6 +9,12 @@ interface RuleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(rule: RuleEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAllIgnore(rules: List<RuleEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllReplace(rules: List<RuleEntity>)
+
     @Update
     suspend fun update(rule: RuleEntity)
 
@@ -20,4 +26,7 @@ interface RuleDao {
 
     @Query("SELECT * FROM rules ORDER BY priority DESC")
     fun observeAll(): Flow<List<RuleEntity>>
+
+    @Query("SELECT * FROM rules ORDER BY id ASC")
+    suspend fun getAllForBackup(): List<RuleEntity>
 }
