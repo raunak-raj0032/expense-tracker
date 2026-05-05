@@ -200,9 +200,9 @@ private fun AiInsightCard(
     GlassPanel(modifier = Modifier.fillMaxWidth(), accent = MaterialTheme.colorScheme.tertiary) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(
-                eyebrow = "Llama Insights",
+                eyebrow = "AI Insights",
                 title = "AI read on your month",
-                subtitle = "Uses your configured laptop Ollama host"
+                subtitle = "Uses your configured AI provider"
             )
             when {
                 loading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {

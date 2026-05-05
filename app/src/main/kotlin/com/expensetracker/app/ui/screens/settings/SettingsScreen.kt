@@ -112,13 +112,13 @@ fun SettingsScreen(
     onOpenCaptureInbox: () -> Unit = {},
     onOpenBudget: () -> Unit = {},
     onOpenStatementImport: () -> Unit = {},
+    onOpenBackup: () -> Unit = {},
     onOpenTags: () -> Unit = {},
     onReplayTutorial: () -> Unit = {},
     isDarkModeEnabled: Boolean = true,
     onDarkModeChange: (Boolean) -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
-    var showBackupDialog  by remember { mutableStateOf(false) }
     var showResetDialog   by remember { mutableStateOf(false) }
     var showAboutDialog   by remember { mutableStateOf(false) }
     var showCurrencyDialog by remember { mutableStateOf(false) }
@@ -254,7 +254,7 @@ fun SettingsScreen(
 
             // Data
             item { SettingsSectionLabel("Data") }
-            item { SettingsItem(Icons.Default.AccountBalance, "Accounts",    "Manage your accounts",         accent = MaterialTheme.colorScheme.secondary) { showPrototypeMessage("Accounts") } }
+            
             item { SettingsItem(Icons.AutoMirrored.Filled.Label, "Tags",     "Manage tags",                  accent = MaterialTheme.colorScheme.secondary, onClick = onOpenTags) }
 
             // Automation
@@ -294,7 +294,6 @@ fun SettingsScreen(
                     onOpenInbox = onOpenCaptureInbox
                 )
             }
-            item { SettingsItem(Icons.AutoMirrored.Filled.Rule, "Rules",       "Automation rules",                  accent = MaterialTheme.colorScheme.tertiary) { showPrototypeMessage("Rules") } }
 
             // On-device AI
             item { SettingsSectionLabel("On-device AI") }
@@ -374,7 +373,7 @@ fun SettingsScreen(
                     subtitle = "Create or restore backup",
                     accent   = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.testTag("settings_backup"),
-                    onClick  = { showBackupDialog = true }
+                    onClick  = onOpenBackup
                 )
             }
 
@@ -473,15 +472,6 @@ fun SettingsScreen(
                     enabled = !resettingData
                 ) { Text("Cancel") }
             }
-        )
-    }
-
-    if (showBackupDialog) {
-        AlertDialog(
-            onDismissRequest = { showBackupDialog = false },
-            title            = { Text("Backup & Restore", fontWeight = FontWeight.ExtraBold) },
-            text             = { Text("Backup and restore are not wired in this prototype yet, but the entry point is in place.") },
-            confirmButton    = { TextButton(onClick = { showBackupDialog = false }) { Text("Got it") } }
         )
     }
 
@@ -819,7 +809,7 @@ private fun AiSettingsCard(
                 ) { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp)) }
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Llama AI Insights", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text("Connect AI Provider", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     Text(aiStatusLine(availability), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (availability !is AiAvailability.Unsupported) {
@@ -920,13 +910,13 @@ private fun aiStatusLine(availability: AiAvailability): String = when (availabil
     is AiAvailability.Unsupported -> "Disabled for local-only privacy"
     AiAvailability.NeedsDownload -> "Configure the laptop Ollama host."
     is AiAvailability.Downloading -> "Downloading model..."
-    AiAvailability.Ready -> "Ready. Phones can request insights from your laptop."
+    AiAvailability.Ready -> "Ready. Phones can connect to your AI provider."
     AiAvailability.Initializing -> "Checking compatibility..."
     is AiAvailability.Error -> "Something went wrong"
 }
 
 private fun unsupportedMessage(reasons: List<AiCompatibility.Reason>): String {
-    if (reasons.isEmpty()) return "External AI insights are disabled so financial data stays on this device."
+    if (reasons.isEmpty()) return "External AI is disabled so financial data stays on this device."
     val phrases = reasons.map {
         when (it) {
             AiCompatibility.Reason.UNSUPPORTED_ABI -> "needs a 64-bit ARM device"
