@@ -53,17 +53,30 @@ class BudgetNotificationService : Service() {
         }
     }
 
+    private val clearReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != ACTION_CLEAR) return
+            scope.launch {
+                userPreferences.setBudgetNotifEnabled(false)
+                stopSelf()
+            }
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         ensureChannel()
         val filter = IntentFilter(ACTION_CYCLE_PERIOD)
+        val clearFilter = IntentFilter(ACTION_CLEAR)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(periodCycleReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(clearReceiver, clearFilter, Context.RECEIVER_NOT_EXPORTED)
         } else {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(periodCycleReceiver, filter)
+            registerReceiver(clearReceiver, clearFilter)
         }
 
         val initialNotif = buildNotification(snapshot = null, period = BudgetPeriod.MONTHLY)
@@ -99,6 +112,7 @@ class BudgetNotificationService : Service() {
         observerJob?.cancel()
         scope.cancel()
         runCatching { unregisterReceiver(periodCycleReceiver) }
+        runCatching { unregisterReceiver(clearReceiver) }
         super.onDestroy()
     }
 
@@ -127,6 +141,11 @@ class BudgetNotificationService : Service() {
         val cyclePi = PendingIntent.getBroadcast(
             this, 1,
             Intent(ACTION_CYCLE_PERIOD).setPackage(packageName),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val clearPi = PendingIntent.getBroadcast(
+            this, 2,
+            Intent(ACTION_CLEAR).setPackage(packageName),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -168,6 +187,7 @@ class BudgetNotificationService : Service() {
             .apply {
                 if (progressMax > 0) setProgress(progressMax, progressNow, false)
                 addAction(0, nextLabel, cyclePi)
+                addAction(0, "Clear", clearPi)
             }
             .build()
             .apply {
@@ -185,6 +205,7 @@ class BudgetNotificationService : Service() {
         const val CHANNEL_ID = "budget_tracker_persistent"
         const val NOTIFICATION_ID = 4711
         const val ACTION_CYCLE_PERIOD = "com.expensetracker.app.action.CYCLE_BUDGET_PERIOD"
+        const val ACTION_CLEAR = "com.expensetracker.app.action.CLEAR_BUDGET_NOTIFICATION"
 
         fun start(context: Context) {
             val intent = Intent(context, BudgetNotificationService::class.java)
