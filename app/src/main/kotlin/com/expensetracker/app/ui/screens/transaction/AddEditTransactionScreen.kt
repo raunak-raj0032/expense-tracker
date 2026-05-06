@@ -66,6 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.core.model.Account
 import com.expensetracker.app.core.model.Tag
 import com.expensetracker.app.core.model.TransactionType
+import com.expensetracker.app.ui.theme.DetailTopBar
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.appButtonSizing
@@ -102,22 +103,17 @@ fun AddEditTransactionScreen(
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
-            TopAppBar(
-                title = { Text(if (transactionId == null) "New Entry" else "Edit Entry") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+            DetailTopBar(
+                title          = if (transactionId == null) "New Entry" else "Edit Entry",
+                eyebrow        = if (transactionId == null) "Add" else "Edit",
+                onNavigateBack = onNavigateBack
+            ) {
+                if (transactionId != null) {
+                    IconButton(onClick = { showDeleteDialog = true }) {
+                        Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                     }
-                },
-                actions = {
-                    if (transactionId != null) {
-                        IconButton(onClick = { showDeleteDialog = true }) {
-                            Icon(Icons.Default.DeleteOutline, contentDescription = "Delete")
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
+                }
+            }
         },
         bottomBar = {
             Column(

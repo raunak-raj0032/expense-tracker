@@ -86,6 +86,8 @@ import com.expensetracker.app.core.model.TransactionType
 import com.expensetracker.app.ui.screens.home.TransactionListItem
 import com.expensetracker.app.ui.screens.home.formatAmount
 import com.expensetracker.app.ui.theme.AccentDivider
+import com.expensetracker.app.ui.theme.DetailTopBar
+import com.expensetracker.app.ui.theme.MainTopBar
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.NeonPill
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
@@ -142,49 +144,55 @@ fun LedgerScreen(
                         }
                     }
                 )
-            } else {
-                TopAppBar(
-                    title = {
-                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondary))
-                                Text("History", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                            }
-                            Text(
-                                text  = if (onNavigateBack != null) "Full transaction record" else "Search, filter, and edit",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    },
-                    navigationIcon = {
-                        onNavigateBack?.let { back ->
-                            IconButton(onClick = back) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onSurface)
-                            }
-                        }
-                    },
-                    colors  = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                    actions = {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                        ) {
-                            IconButton(onClick = { showFilterSheet = true }) {
-                                BadgedBox(badge = {
-                                    if (uiState.activeFilterCount > 0) {
-                                        Badge(containerColor = MaterialTheme.colorScheme.primary) {
-                                            Text(uiState.activeFilterCount.toString())
-                                        }
+            } else if (onNavigateBack != null) {
+                DetailTopBar(
+                    title          = "History",
+                    subtitle       = "Full transaction record",
+                    accent         = MaterialTheme.colorScheme.secondary,
+                    onNavigateBack = onNavigateBack
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                    ) {
+                        IconButton(onClick = { showFilterSheet = true }) {
+                            BadgedBox(badge = {
+                                if (uiState.activeFilterCount > 0) {
+                                    Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                                        Text(uiState.activeFilterCount.toString())
                                     }
-                                }) {
-                                    Icon(Icons.Default.FilterList, "Filter", tint = MaterialTheme.colorScheme.primary)
                                 }
+                            }) {
+                                Icon(Icons.Default.FilterList, "Filter", tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
-                )
+                }
+            } else {
+                MainTopBar(
+                    title    = "History",
+                    subtitle = "Search, filter, and edit",
+                    accent   = MaterialTheme.colorScheme.secondary
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                    ) {
+                        IconButton(onClick = { showFilterSheet = true }) {
+                            BadgedBox(badge = {
+                                if (uiState.activeFilterCount > 0) {
+                                    Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                                        Text(uiState.activeFilterCount.toString())
+                                    }
+                                }
+                            }) {
+                                Icon(Icons.Default.FilterList, "Filter", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
             }
         }
     ) { padding ->
@@ -553,7 +561,8 @@ fun FilterSheet(
     if (showCustomPicker) {
         val pickerState = rememberDateRangePickerState(
             initialSelectedStartDateMillis = state.startDate?.toEpochMillisStart(),
-            initialSelectedEndDateMillis = state.endDate?.toEpochMillisStart()
+            initialSelectedEndDateMillis = state.endDate?.toEpochMillisStart(),
+            initialDisplayMode = androidx.compose.material3.DisplayMode.Input
         )
         DatePickerDialog(
             onDismissRequest = { showCustomPicker = false },
@@ -574,7 +583,7 @@ fun FilterSheet(
             DateRangePicker(
                 state = pickerState,
                 title = { Text("Custom range", modifier = Modifier.padding(start = 24.dp, top = 16.dp)) },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp)
             )
         }
     }

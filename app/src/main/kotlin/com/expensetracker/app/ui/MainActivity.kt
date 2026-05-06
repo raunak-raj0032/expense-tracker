@@ -20,6 +20,8 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
     private var captureInboxRequest by mutableStateOf(0)
+    private var notificationRouteRequest by mutableStateOf(0)
+    private var notificationRoute by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,7 +38,9 @@ class MainActivity : FragmentActivity() {
                         MainNavigation(
                             darkThemeEnabled = darkThemeEnabled,
                             onDarkThemeChange = { darkThemeEnabled = it },
-                            captureInboxRequest = captureInboxRequest
+                            captureInboxRequest = captureInboxRequest,
+                            notificationRoute = notificationRoute,
+                            notificationRouteRequest = notificationRouteRequest
                         )
                     }
                 }
@@ -54,5 +58,13 @@ class MainActivity : FragmentActivity() {
         if (intent?.hasExtra("capture_event_id") == true) {
             captureInboxRequest += 1
         }
+        intent?.getStringExtra(EXTRA_NAV_ROUTE)?.let { route ->
+            notificationRoute = route
+            notificationRouteRequest += 1
+        }
+    }
+
+    companion object {
+        const val EXTRA_NAV_ROUTE = "com.expensetracker.app.extra.NAV_ROUTE"
     }
 }

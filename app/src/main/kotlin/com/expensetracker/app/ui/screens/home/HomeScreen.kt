@@ -49,7 +49,6 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -80,7 +79,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
@@ -91,6 +89,7 @@ import com.expensetracker.app.auth.AuthViewModel
 import com.expensetracker.app.core.model.Transaction
 import com.expensetracker.app.ui.mascot.TutorialTarget
 import com.expensetracker.app.ui.theme.AccentDivider
+import com.expensetracker.app.ui.theme.MainTopBar
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.GlowProgressBar
 import com.expensetracker.app.ui.theme.NeonPill
@@ -105,11 +104,6 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
-
-import android.net.Uri
-import android.os.Environment
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,129 +125,59 @@ fun HomeScreen(
     val profilePicturePath = uiState.profilePicturePath
     var visible by remember { mutableStateOf(false) }
     var showBulkDeleteDialog by remember { mutableStateOf(false) }
-    var showProfilePicker by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { delay(80); visible = true }
-
-    val context = LocalContext.current
-
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            viewModel.setProfilePictureUri(it) { path ->
-                path?.let { viewModel.setProfilePicturePath(it) }
-            }
-        }
-    }
-
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success ->
-    }
-
-    fun takePhoto() {
-        val photoFile = java.io.File(
-            context.getExternalFilesDir(Environment.DIRECTORY_PICTURES),
-            "profile_${System.currentTimeMillis()}.jpg"
-        )
-        cameraLauncher.launch(Uri.fromFile(photoFile))
-    }
-
-    fun pickImage() {
-        imagePickerLauncher.launch("image/*")
-    }
 
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
             if (uiState.selectionMode) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = "${uiState.selectedTransactionIds.size} selected",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = viewModel::clearSelection) {
-                            Icon(Icons.Default.Close, "Cancel", tint = MaterialTheme.colorScheme.onSurface)
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                    actions = {
-                        IconButton(onClick = { showBulkDeleteDialog = true }) {
-                            Icon(Icons.Default.Delete, "Delete selected", tint = MaterialTheme.colorScheme.error)
-                        }
+                MainTopBar(
+                    title  = "${uiState.selectedTransactionIds.size} selected",
+                    accent = MaterialTheme.colorScheme.error
+                ) {
+                    IconButton(onClick = viewModel::clearSelection) {
+                        Icon(Icons.Default.Close, "Cancel")
                     }
-                )
+                    IconButton(onClick = { showBulkDeleteDialog = true }) {
+                        Icon(Icons.Default.Delete, "Delete selected", tint = MaterialTheme.colorScheme.error)
+                    }
+                }
             } else {
-            TopAppBar(
-                title = {
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary)
-                            )
-                            Text(
-                                text       = if (firstName.isNotBlank()) "Hi, $firstName" else "Pocket Pulse",
-                                style      = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.ExtraBold,
-                                color      = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Text(
-                            text  = if (firstName.isNotBlank()) "Welcome back to Pocket Pulse" else "Your daily money rhythm",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor     = Color.Transparent,
-                    titleContentColor  = MaterialTheme.colorScheme.onSurface
-                ),
-                actions = {
+                MainTopBar(
+                    title    = if (firstName.isNotBlank()) "Hi, $firstName" else "Pocket Pulse",
+                    subtitle = if (firstName.isNotBlank()) "Welcome back" else "Your daily money rhythm",
+                    accent   = MaterialTheme.colorScheme.primary
+                ) {
                     TextButton(onClick = onViewLedger) {
-                        Text(
-                            text       = "Ledger",
-                            color      = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Text("Ledger", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                     }
-                    IconButton(onClick = { showProfilePicker = true }) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (profilePicturePath.isNotEmpty() && java.io.File(profilePicturePath).exists()) {
-                                AsyncImage(
-                                    model = java.io.File(profilePicturePath),
-                                    contentDescription = "Profile",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.Person,
-                                    contentDescription = "Profile",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                    // Profile avatar
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (profilePicturePath.isNotEmpty() && java.io.File(profilePicturePath).exists())
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                else
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                            )
+                            .clickable { onOpenProfile() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (profilePicturePath.isNotEmpty() && java.io.File(profilePicturePath).exists()) {
+                            AsyncImage(
+                                model = java.io.File(profilePicturePath),
+                                contentDescription = "Profile",
+                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(Icons.Default.Person, "Profile", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                         }
                     }
                 }
-            )
             }
         },
         floatingActionButton = {
@@ -429,53 +353,6 @@ fun HomeScreen(
         )
     }
 
-    if (showProfilePicker) {
-        AlertDialog(
-            onDismissRequest = { showProfilePicker = false },
-            title = { Text("Change Profile Photo") },
-            text = {
-                Column {
-                    TextButton(
-                        onClick = {
-                            showProfilePicker = false
-                            takePhoto()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.CameraAlt, null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text("Take Photo")
-                    }
-                    TextButton(
-                        onClick = {
-                            showProfilePicker = false
-                            pickImage()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Person, null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text("Choose from Gallery")
-                    }
-                    TextButton(
-                        onClick = {
-                            showProfilePicker = false
-                            onOpenProfile()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Person, null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text("Edit Full Profile")
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showProfilePicker = false }) { Text("Cancel") }
-            }
-        )
-    }
 }
 
 @Composable
@@ -523,15 +400,10 @@ fun MonthlySummaryCard(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text  = monthName.uppercase(),
+                    text  = "$monthName · Day $dayOfMonth".uppercase(),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     letterSpacing = 1.2.sp
-                )
-                Text(
-                    text       = "Money Mission",
-                    style      = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold
                 )
             }
             NeonPill(text = "INR ₹")

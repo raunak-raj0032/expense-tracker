@@ -11,6 +11,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -29,6 +30,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -455,6 +459,184 @@ fun NeonPill(
             fontWeight = FontWeight.SemiBold
         )
     }
+}
+
+// ─── App Top Bar ──────────────────────────────────────────────────────────────
+/**
+ * Branded top bar for detail screens with a back button.
+ * Shows a styled back arrow, title with optional eyebrow/subtitle, and
+ * a thin accent shimmer line at the bottom.
+ */
+@Composable
+fun DetailTopBar(
+    title: String,
+    subtitle: String? = null,
+    eyebrow: String? = null,
+    accent: Color = MaterialTheme.colorScheme.primary,
+    onNavigateBack: () -> Unit,
+    actions: @Composable RowScope.() -> Unit = {}
+) {
+    val surface        = MaterialTheme.colorScheme.surface
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(surface.copy(alpha = 0.88f), surfaceVariant.copy(alpha = 0.60f))
+                    )
+                )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 4.dp, end = 8.dp, top = 8.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Styled back button
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(accent.copy(alpha = 0.10f))
+                        .clickable(onClick = onNavigateBack),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.Icon(
+                        imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = "Back",
+                        tint = accent,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                // Title block
+                Column(
+                    modifier = Modifier.weight(1f).padding(start = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.dp)
+                ) {
+                    if (eyebrow != null) {
+                        Text(
+                            text = eyebrow.uppercase(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = accent,
+                            letterSpacing = 1.2.sp
+                        )
+                    }
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (subtitle != null) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                // Actions
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    content = actions
+                )
+            }
+        }
+        TopBarShimmerLine(accent)
+    }
+}
+
+/**
+ * Branded top bar for main (tab) screens — no back button.
+ * Shows a dot accent + bold title and optional subtitle, with a shimmer bottom line.
+ */
+@Composable
+fun MainTopBar(
+    title: String,
+    subtitle: String? = null,
+    accent: Color = MaterialTheme.colorScheme.primary,
+    actions: @Composable RowScope.() -> Unit = {}
+) {
+    val surface        = MaterialTheme.colorScheme.surface
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(surface.copy(alpha = 0.88f), surfaceVariant.copy(alpha = 0.60f))
+                    )
+                )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.radialGradient(
+                                        listOf(accent, accent.copy(alpha = 0.4f))
+                                    )
+                                )
+                        )
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    if (subtitle != null) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    content = actions
+                )
+            }
+        }
+        TopBarShimmerLine(accent)
+    }
+}
+
+@Composable
+private fun TopBarShimmerLine(accent: Color) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(
+                Brush.horizontalGradient(
+                    listOf(
+                        Color.Transparent,
+                        accent.copy(alpha = 0.55f),
+                        accent.copy(alpha = 0.20f),
+                        Color.Transparent
+                    )
+                )
+            )
+    )
 }
 
 // ─── Accent Divider ───────────────────────────────────────────────────────────

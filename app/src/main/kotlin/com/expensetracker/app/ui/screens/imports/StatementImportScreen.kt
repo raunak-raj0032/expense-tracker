@@ -72,6 +72,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.expensetracker.app.core.model.TransactionType
 import com.expensetracker.app.statement.StatementPreviewEntry
 import com.expensetracker.app.ui.screens.home.formatAmount
+import com.expensetracker.app.ui.theme.DetailTopBar
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
@@ -124,25 +125,10 @@ fun StatementImportScreen(
         containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Statement Import")
-                        Text(
-                            text = "Parse monthly bank or card statements into your ledger",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
+            DetailTopBar(
+                title          = "Statement Import",
+                subtitle       = "Parse bank or card statements into your ledger",
+                onNavigateBack = onNavigateBack
             )
         }
     ) { padding ->

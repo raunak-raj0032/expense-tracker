@@ -52,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.capture.CaptureSuggestion
 import com.expensetracker.app.core.model.CaptureSourceType
 import com.expensetracker.app.ui.screens.home.formatAmount
+import com.expensetracker.app.ui.theme.DetailTopBar
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.adaptiveFlowLayout
@@ -78,25 +79,10 @@ fun CaptureReviewScreen(
         containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Capture Inbox")
-                        Text(
-                            text = "Captured from SMS, notifications, and UPI screens",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
+            DetailTopBar(
+                title          = "Capture Inbox",
+                subtitle       = "Captured from SMS, notifications & UPI",
+                onNavigateBack = onNavigateBack
             )
         }
     ) { padding ->

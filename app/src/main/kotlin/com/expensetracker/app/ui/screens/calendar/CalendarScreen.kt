@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -61,6 +62,7 @@ import com.expensetracker.app.core.model.CalendarDay
 import com.expensetracker.app.ui.screens.home.TransactionListItem
 import com.expensetracker.app.ui.screens.home.formatAmount
 import com.expensetracker.app.ui.theme.GlassPanel
+import com.expensetracker.app.ui.theme.MainTopBar
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
 import com.expensetracker.app.ui.theme.CardSpacing
@@ -130,20 +132,10 @@ fun CalendarScreen(
     Scaffold(
         containerColor = Color.Transparent,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Rhythm")
-                        Text(
-                            text = "See your spending cadence by month, week, or range",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
+            MainTopBar(
+                title    = "Rhythm",
+                subtitle = "Spending cadence by month, week, or range",
+                accent   = MaterialTheme.colorScheme.tertiary
             )
         }
     ) { padding ->
@@ -300,7 +292,8 @@ fun CalendarScreen(
     if (showCustomRangePicker) {
         val rangePickerState = rememberDateRangePickerState(
             initialSelectedStartDateMillis = customStart.toEpochMillis(),
-            initialSelectedEndDateMillis = customEnd.toEpochMillis()
+            initialSelectedEndDateMillis = customEnd.toEpochMillis(),
+            initialDisplayMode = androidx.compose.material3.DisplayMode.Input
         )
         DatePickerDialog(
             onDismissRequest = { showCustomRangePicker = false },
@@ -335,7 +328,7 @@ fun CalendarScreen(
                         modifier = Modifier.padding(start = 24.dp, top = 16.dp)
                     )
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp)
             )
         }
     }

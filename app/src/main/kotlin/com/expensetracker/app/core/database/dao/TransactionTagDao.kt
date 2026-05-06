@@ -27,6 +27,9 @@ interface TransactionTagDao {
     @Query("DELETE FROM transaction_tags WHERE transactionId = :transactionId")
     suspend fun deleteAllForTransaction(transactionId: Long)
 
+    @Query("SELECT * FROM transaction_tags WHERE transactionId IN (:transactionIds)")
+    suspend fun getForTransactions(transactionIds: List<Long>): List<TransactionTagEntity>
+
     @Query("SELECT * FROM transaction_tags ORDER BY transactionId ASC, tagId ASC")
     suspend fun getAllForBackup(): List<TransactionTagEntity>
 }

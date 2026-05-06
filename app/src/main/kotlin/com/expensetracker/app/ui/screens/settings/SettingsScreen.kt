@@ -98,6 +98,7 @@ import androidx.compose.material3.FilterChipDefaults
 import com.expensetracker.app.capture.requestCaptureNotificationRebind
 import com.expensetracker.app.core.money.CurrencyConverter
 import com.expensetracker.app.ui.theme.GlassPanel
+import com.expensetracker.app.ui.theme.MainTopBar
 import com.expensetracker.app.ui.theme.NeonPill
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import com.expensetracker.app.ui.theme.SectionHeader
@@ -191,17 +192,10 @@ fun SettingsScreen(
         containerColor = Color.Transparent,
         snackbarHost   = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.tertiary))
-                            Text("Pocket HQ", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                        }
-                        Text("Controls, exports & account setup", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            MainTopBar(
+                title    = "Pocket HQ",
+                subtitle = "Controls, exports & account setup",
+                accent   = MaterialTheme.colorScheme.tertiary
             )
         }
     ) { padding ->

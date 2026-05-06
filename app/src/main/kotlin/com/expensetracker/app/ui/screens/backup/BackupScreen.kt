@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.core.data.repository.RestoreMode
+import com.expensetracker.app.ui.theme.DetailTopBar
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
 import java.util.Date
 
@@ -103,14 +104,10 @@ fun BackupScreen(
         containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.55f),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = { Text("Backup & Restore", fontWeight = FontWeight.ExtraBold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.75f))
+            DetailTopBar(
+                title          = "Backup & Restore",
+                subtitle       = "Export or import all your data",
+                onNavigateBack = onNavigateBack
             )
         }
     ) { padding ->
