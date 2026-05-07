@@ -2,4 +2,9 @@
 <resources>
     <color name="ic_launcher_background">#0E2623</color>
     <color name="budget_notification_accent">#20D6A3</color>
+    <color name="budget_notif_status_safe">#22C55E</color>
+    <color name="budget_notif_status_warn">#F59E0B</color>
+    <color name="budget_notif_status_high">#FB923C</color>
+    <color name="budget_notif_status_over">#EF4444</color>
+    <color name="budget_notif_muted">#94A3B8</color>
 </resources>

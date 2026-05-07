@@ -146,17 +146,22 @@ class BudgetNotificationService : Service() {
             )
         }
 
-        val title: String
-        val compactText: String
+        val titleHtml: String
+        val compactHtml: String
         val expandedHtml: String
+        val accentColor: Int
         val progressMax: Int
         val progressNow: Int
 
+        val mutedHex = colorHex(R.color.budget_notif_muted)
+
         if (snapshot == null || !snapshot.hasBudget) {
-            title       = "Pocket Pulse  ·  ${period.label}"
-            compactText = "No budget set — tap to get started"
-            expandedHtml = "No budget set for <b>${period.label}</b><br>" +
-                           "Tap <b>Budget</b> below to set your spending limit."
+            accentColor  = ContextCompat.getColor(this, R.color.budget_notification_accent)
+            titleHtml    = "<b>Pocket Pulse</b>"
+            compactHtml  = "Tap to set a <b>${period.label.lowercase()}</b> budget"
+            expandedHtml =
+                "No budget set for <b>${period.label}</b>.<br>" +
+                "<font color='#$mutedHex'>Tap <b>Budget</b> below to set your spending limit.</font>"
             progressMax  = 0
             progressNow  = 0
         } else {
@@ -165,38 +170,56 @@ class BudgetNotificationService : Service() {
             val remaining = snapshot.remainingMinor ?: 0L
             val pct       = (snapshot.progressFraction * 100).toInt().coerceIn(0, 100)
 
-            val statusDot = when {
-                pct >= 100 -> "🔴"
-                pct >= 85  -> "🟠"
-                pct >= 60  -> "🟡"
-                else       -> "🟢"
+            val statusColorRes = when {
+                pct >= 100 -> R.color.budget_notif_status_over
+                pct >= 85  -> R.color.budget_notif_status_high
+                pct >= 60  -> R.color.budget_notif_status_warn
+                else       -> R.color.budget_notif_status_safe
             }
+            accentColor = ContextCompat.getColor(this, statusColorRes)
+            val accentHex = colorHex(statusColorRes)
 
-            title       = "$statusDot  ${formatRupees(spent)} spent  ·  ${period.label}"
-            compactText = if (remaining >= 0)
-                "${formatRupees(remaining)} left  ·  $pct% used"
-            else
-                "Over by ${formatRupees(kotlin.math.abs(remaining))}  ·  $pct%"
-
+            val bar = progressBar(pct)
             val periodContext = snapshot.periodLabel.ifBlank { period.label }
-            val remainingLine = if (remaining >= 0)
-                "<b>${formatRupees(remaining)}</b> remaining  ·  $periodContext"
+
+            titleHtml = "<font color='#$accentHex'>●</font>  " +
+                "<b>${formatRupees(spent)}</b> " +
+                "<font color='#$mutedHex'>spent · ${period.label}</font>"
+
+            compactHtml = if (remaining >= 0)
+                "<b>${formatRupees(remaining)}</b> left " +
+                    "<font color='#$mutedHex'>·</font> " +
+                    "<font color='#$accentHex'>$pct%</font>"
             else
-                "<b>${formatRupees(kotlin.math.abs(remaining))}</b> over budget  ·  $periodContext"
+                "<font color='#$accentHex'><b>Over</b></font> by " +
+                    "<b>${formatRupees(kotlin.math.abs(remaining))}</b> " +
+                    "<font color='#$mutedHex'>·</font> " +
+                    "<font color='#$accentHex'>$pct%</font>"
+
+            val summaryLine = if (remaining >= 0)
+                "<b>${formatRupees(remaining)}</b> " +
+                    "<font color='#$mutedHex'>remaining · $periodContext</font>"
+            else
+                "<font color='#$accentHex'><b>${formatRupees(kotlin.math.abs(remaining))} over</b></font> " +
+                    "<font color='#$mutedHex'>· $periodContext</font>"
 
             expandedHtml =
-                "【 <b>$pct%</b> used 】  ${formatRupees(spent)} of <b>${formatRupees(budget)}</b><br>" +
-                remainingLine
+                "<font color='#$accentHex'>$bar</font>  <b>$pct%</b><br>" +
+                "<font color='#$mutedHex'>${formatRupees(spent)} of</font> " +
+                "<b>${formatRupees(budget)}</b><br>" +
+                summaryLine
 
             progressMax = 100
             progressNow = pct
         }
 
+        val titleText    = HtmlCompat.fromHtml(titleHtml, HtmlCompat.FROM_HTML_MODE_COMPACT)
+        val compactText  = HtmlCompat.fromHtml(compactHtml, HtmlCompat.FROM_HTML_MODE_COMPACT)
         val expandedText = HtmlCompat.fromHtml(expandedHtml, HtmlCompat.FROM_HTML_MODE_COMPACT)
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_budget_notif)
-            .setContentTitle(title)
+            .setContentTitle(titleText)
             .setContentText(compactText)
             .setSubText("Pocket Pulse")
             .setOngoing(true)
@@ -205,20 +228,21 @@ class BudgetNotificationService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setColor(ContextCompat.getColor(this, R.color.budget_notification_accent))
+            .setColor(accentColor)
+            .setColorized(false)
             .setStyle(
                 NotificationCompat.BigTextStyle()
                     .bigText(expandedText)
-                    .setBigContentTitle(title)
+                    .setBigContentTitle(titleText)
                     .setSummaryText("Pocket Pulse")
             )
             .setContentIntent(openAppPi)
             .setDeleteIntent(restartPi)
             .apply {
                 if (progressMax > 0) setProgress(progressMax, progressNow, false)
-                addAction(0, "✚  Add Expense",         addExpensePi)
-                addAction(0, "◎  Budget",               budgetPi)
-                addAction(0, "↻  ${period.next().label}", cyclePi)
+                addAction(R.drawable.ic_notif_add,     "Add expense",          addExpensePi)
+                addAction(R.drawable.ic_notif_wallet,  "Budget",               budgetPi)
+                addAction(R.drawable.ic_notif_refresh, period.next().label,    cyclePi)
             }
             .build()
             .apply {
@@ -255,7 +279,31 @@ class BudgetNotificationService : Service() {
     private fun formatRupees(minor: Long): String {
         val rupees = minor / 100
         val paise = minor % 100
-        return "₹$rupees${if (paise > 0) ".${paise.toString().padStart(2, '0')}" else ""}"
+        val rupeesGrouped = groupIndianDigits(rupees)
+        return "₹$rupeesGrouped${if (paise > 0) ".${paise.toString().padStart(2, '0')}" else ""}"
+    }
+
+    private fun groupIndianDigits(n: Long): String {
+        val s = n.toString()
+        if (s.length <= 3) return s
+        val head = s.dropLast(3)
+        val tail = s.takeLast(3)
+        val groupedHead = head.reversed()
+            .chunked(2)
+            .joinToString(",")
+            .reversed()
+        return "$groupedHead,$tail"
+    }
+
+    private fun progressBar(pct: Int): String {
+        val total = 12
+        val filled = (pct * total / 100).coerceIn(0, total)
+        return "▰".repeat(filled) + "▱".repeat(total - filled)
+    }
+
+    private fun colorHex(@androidx.annotation.ColorRes res: Int): String {
+        val argb = ContextCompat.getColor(this, res)
+        return String.format("%06X", argb and 0xFFFFFF)
     }
 
     companion object {
