@@ -8,7 +8,7 @@ import javax.inject.Singleton
 
 @Singleton
 class DeviceIdProvider @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     fun getDeviceId(): String = Settings.Secure.getString(
         context.contentResolver,

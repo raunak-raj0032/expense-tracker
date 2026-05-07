@@ -22,7 +22,7 @@ import kotlinx.coroutines.tasks.await
 
 @Singleton
 class AuthRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val firebaseAuthService: FirebaseAuthService
 ) {
     private val credentialManager = CredentialManager.create(context)

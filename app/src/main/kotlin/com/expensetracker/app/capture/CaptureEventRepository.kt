@@ -25,7 +25,7 @@ import javax.inject.Singleton
 
 @Singleton
 class CaptureEventRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val captureEventDao: CaptureEventDao,
     private val transactionRepository: TransactionRepository,
     private val accountDao: AccountDao,

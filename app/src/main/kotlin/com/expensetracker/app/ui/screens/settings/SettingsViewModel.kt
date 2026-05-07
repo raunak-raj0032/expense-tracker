@@ -29,7 +29,7 @@ class SettingsViewModel @Inject constructor(
     private val userPreferences: UserPreferences,
     private val onDeviceAiManager: OnDeviceAiManager,
     private val captureEventRepository: CaptureEventRepository,
-    @ApplicationContext private val appContext: Context
+    @param:ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     val biometricEnabled: StateFlow<Boolean> = userPreferences.biometricEnabled

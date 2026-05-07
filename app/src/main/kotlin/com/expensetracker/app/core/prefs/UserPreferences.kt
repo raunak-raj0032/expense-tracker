@@ -25,7 +25,7 @@ private val Context.userPrefsDataStore by preferencesDataStore(name = "user_pref
 
 @Singleton
 class UserPreferences @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     private val onboardingKey = booleanPreferencesKey("onboarding_seen")
     private val biometricKey = booleanPreferencesKey("biometric_enabled")

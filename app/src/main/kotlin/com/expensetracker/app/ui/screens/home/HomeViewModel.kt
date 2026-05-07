@@ -53,7 +53,7 @@ data class HomeUiState(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val transactionRepository: TransactionRepository,
     private val budgetRepository: BudgetRepository,
     private val captureEventRepository: CaptureEventRepository,
