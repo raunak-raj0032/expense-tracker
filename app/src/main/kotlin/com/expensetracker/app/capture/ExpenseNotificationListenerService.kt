@@ -8,6 +8,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -17,6 +19,7 @@ class ExpenseNotificationListenerService : NotificationListenerService() {
     lateinit var captureEventRepository: CaptureEventRepository
 
     private val serviceScope = CoroutineScope(Dispatchers.IO)
+    private val recentNotificationFingerprints = ConcurrentHashMap<String, Long>()
 
     companion object {
         private val SUPPORTED_PACKAGES = setOf(
@@ -56,8 +59,16 @@ class ExpenseNotificationListenerService : NotificationListenerService() {
             "transaction",
             "imps",
             "neft",
-            "rtgs"
+            "rtgs",
+            "utr",
+            "rrn",
+            "card",
+            "a/c",
+            "account",
+            "banking name"
         )
+
+        private const val DEDUPE_WINDOW_MS = 2 * 60 * 1000L
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -105,6 +116,19 @@ class ExpenseNotificationListenerService : NotificationListenerService() {
             return
         }
 
+        val fingerprint = listOf(sbn.packageName, title, text, subtext)
+            .joinToString("|")
+            .lowercase(Locale.ROOT)
+            .hashCode()
+            .toString()
+        val now = System.currentTimeMillis()
+        val previous = recentNotificationFingerprints[fingerprint]
+        if (previous != null && now - previous < DEDUPE_WINDOW_MS) {
+            return
+        }
+        recentNotificationFingerprints[fingerprint] = now
+        recentNotificationFingerprints.entries.removeIf { now - it.value > DEDUPE_WINDOW_MS }
+
         captureEventRepository.captureNotification(
             packageName = sbn.packageName,
             title = title,
@@ -121,6 +145,10 @@ class ExpenseNotificationListenerService : NotificationListenerService() {
             return false
         }
 
+        if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) {
+            return false
+        }
+
         if (SUPPORTED_PACKAGES.contains(sbn.packageName)) {
             return true
         }
@@ -132,6 +160,7 @@ class ExpenseNotificationListenerService : NotificationListenerService() {
             extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString(),
             extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString(),
             extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)?.toString(),
+            extras.getCharSequence(Notification.EXTRA_INFO_TEXT)?.toString(),
             extras.getCharSequence(Notification.EXTRA_TITLE_BIG)?.toString(),
             extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
                 ?.joinToString(" ") { it.toString() }
@@ -145,6 +174,7 @@ class ExpenseNotificationListenerService : NotificationListenerService() {
             extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString(),
             extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
             extras.getCharSequence(Notification.EXTRA_TITLE_BIG)?.toString(),
+            extras.getCharSequence(Notification.EXTRA_INFO_TEXT)?.toString(),
             extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
                 ?.joinToString(" ") { it.toString() }
         )

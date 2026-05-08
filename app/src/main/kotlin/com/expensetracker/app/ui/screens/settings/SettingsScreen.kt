@@ -86,6 +86,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -97,6 +98,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import com.expensetracker.app.capture.requestCaptureNotificationRebind
 import com.expensetracker.app.core.money.CurrencyConverter
+import com.expensetracker.app.diagnostics.AppDiagnostics
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.MainTopBar
 import com.expensetracker.app.ui.theme.NeonPill
@@ -145,12 +147,15 @@ fun SettingsScreen(
     var notificationPermissionGranted by remember { mutableStateOf(true) }
     var notificationAccessEnabled by remember { mutableStateOf(false) }
     var accessibilityOn by remember { mutableStateOf(false) }
+    var batteryOptimized by remember { mutableStateOf(false) }
+    var batteryPromptShownThisSession by remember { mutableStateOf(false) }
 
     fun refreshCaptureStates() {
         hasSmsPermission = hasSmsAccess(context)
         notificationPermissionGranted = hasPostNotificationsAccess(context)
         notificationAccessEnabled = hasNotificationListenerAccess(context)
         accessibilityOn = hasAccessibilityAccess(context)
+        batteryOptimized = accessibilityOn && !isBatteryOptimizationIgnored(context)
         if (notificationAccessEnabled) {
             requestCaptureNotificationRebind(context)
         }
@@ -166,6 +171,13 @@ fun SettingsScreen(
     LaunchedEffect(Unit) { delay(60); visible = true }
 
     LaunchedEffect(Unit) { refreshCaptureStates() }
+
+    LaunchedEffect(accessibilityOn, batteryOptimized) {
+        if (accessibilityOn && batteryOptimized && !batteryPromptShownThisSession) {
+            batteryPromptShownThisSession = true
+            showBatteryOptSheet = true
+        }
+    }
 
     DisposableEffect(lifecycleOwner, context) {
         val observer = LifecycleEventObserver { _, event ->
@@ -259,7 +271,7 @@ fun SettingsScreen(
                     notificationPermissionGranted = notificationPermissionGranted,
                     notificationAccessEnabled = notificationAccessEnabled,
                     accessibilityOn = accessibilityOn,
-                    batteryOptimized = accessibilityOn && !isBatteryOptimizationIgnored(context),
+                    batteryOptimized = batteryOptimized,
                     importingSms = importingSms,
                     onGrantSmsAccess = {
                         smsPermissionLauncher.launch(
@@ -403,6 +415,15 @@ fun SettingsScreen(
                     accent   = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag("settings_about"),
                     onClick  = { showAboutDialog = true }
+                )
+            }
+            item {
+                SettingsItem(
+                    icon = Icons.Default.Info,
+                    title = "Diagnostic logs",
+                    subtitle = "Share crash details when something closes unexpectedly",
+                    accent = MaterialTheme.colorScheme.tertiary,
+                    onClick = { shareDiagnosticLog(context) }
                 )
             }
 
@@ -771,6 +792,27 @@ fun SettingsItem(
 // Keep old function name for compatibility
 @Composable
 fun SettingsSection(title: String) = SettingsSectionLabel(title)
+
+private fun shareDiagnosticLog(context: Context) {
+    AppDiagnostics.log("Diagnostic log shared from Settings")
+    val file = AppDiagnostics.logFile(context)
+    if (!AppDiagnostics.hasLog(context)) {
+        file.parentFile?.mkdirs()
+        file.writeText("No crash log captured yet.\n")
+    }
+    val uri = FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.provider",
+        file
+    )
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, "Pocket Pulse diagnostic log")
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share diagnostic log"))
+}
 
 @Composable
 private fun AiSettingsCard(

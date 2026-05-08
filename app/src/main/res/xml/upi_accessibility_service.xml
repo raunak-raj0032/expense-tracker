@@ -6,4 +6,4 @@
     android:canRetrieveWindowContent="true"
     android:description="@string/upi_accessibility_service_description"
     android:notificationTimeout="300"
-    android:packageNames="com.google.android.apps.nbu.paisa.user,com.google.android.apps.nbu.paisa.provider,com.phonepe.app,com.phonepe.app.preprod,net.one97.paytm,com.paytm.app,in.org.npci.bhimapp,in.amazon.mShop.android.shopping,com.dreamplug.androidapp,com.mobikwik_new,com.freecharge.android,com.whatsapp" />
+    android:packageNames="com.google.android.apps.nbu.paisa.user,com.google.android.apps.nbu.paisa.provider,com.phonepe.app,com.phonepe.app.preprod,net.one97.paytm,com.paytm.app,in.org.npci.bhimapp,in.amazon.mShop.android.shopping,com.dreamplug.androidapp,com.mobikwik_new,com.freecharge.android,com.whatsapp,com.whatsapp.w4b,com.upi.axispay,com.sbi.upi,com.fss.unbipsp,com.csam.icici.bank.imobile,com.axisbank.digibank,com.icici.bank.imobile" />

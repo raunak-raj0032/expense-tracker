@@ -14,6 +14,7 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.text.HtmlCompat
@@ -120,13 +121,9 @@ class BudgetNotificationService : Service() {
     }
 
     private fun buildNotification(snapshot: BudgetSnapshot?, period: BudgetPeriod): Notification {
-        val openAppPi = PendingIntent.getActivity(
-            this, 0,
-            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        val addExpensePi = routePendingIntent(Screen.AddTransaction.route, 10)
-        val budgetPi    = routePendingIntent(Screen.Budgets.route, 11)
+        val openAppPi = openAppPendingIntent(requestCode = 0)
+        val addExpensePi = openAppPendingIntent(route = Screen.AddTransaction.route, requestCode = 10)
+        val budgetPi = openAppPendingIntent(route = Screen.Budgets.route, requestCode = 11)
         val cyclePi = PendingIntent.getBroadcast(
             this, 1,
             Intent(ACTION_CYCLE_PERIOD).setPackage(packageName),
@@ -148,7 +145,10 @@ class BudgetNotificationService : Service() {
 
         val titleHtml: String
         val compactHtml: String
-        val expandedHtml: String
+        val heroText: String
+        val labelText: String
+        val metaText: String
+        val statusText: String
         val accentColor: Int
         val progressMax: Int
         val progressNow: Int
@@ -159,9 +159,10 @@ class BudgetNotificationService : Service() {
             accentColor  = ContextCompat.getColor(this, R.color.budget_notification_accent)
             titleHtml    = "<b>Pocket Pulse</b>"
             compactHtml  = "Tap to set a <b>${period.label.lowercase()}</b> budget"
-            expandedHtml =
-                "No budget set for <b>${period.label}</b>.<br>" +
-                "<font color='#$mutedHex'>Tap <b>Budget</b> below to set your spending limit.</font>"
+            heroText     = "No budget yet"
+            labelText    = "${period.label} plan"
+            metaText     = "Set a limit to unlock live spend tracking"
+            statusText   = "Setup"
             progressMax  = 0
             progressNow  = 0
         } else {
@@ -179,9 +180,6 @@ class BudgetNotificationService : Service() {
             accentColor = ContextCompat.getColor(this, statusColorRes)
             val accentHex = colorHex(statusColorRes)
 
-            val bar = progressBar(pct)
-            val periodContext = snapshot.periodLabel.ifBlank { period.label }
-
             titleHtml = "<font color='#$accentHex'>●</font>  " +
                 "<b>${formatRupees(spent)}</b> " +
                 "<font color='#$mutedHex'>spent · ${period.label}</font>"
@@ -196,18 +194,15 @@ class BudgetNotificationService : Service() {
                     "<font color='#$mutedHex'>·</font> " +
                     "<font color='#$accentHex'>$pct%</font>"
 
-            val summaryLine = if (remaining >= 0)
-                "<b>${formatRupees(remaining)}</b> " +
-                    "<font color='#$mutedHex'>remaining · $periodContext</font>"
-            else
-                "<font color='#$accentHex'><b>${formatRupees(kotlin.math.abs(remaining))} over</b></font> " +
-                    "<font color='#$mutedHex'>· $periodContext</font>"
-
-            expandedHtml =
-                "<font color='#$accentHex'>$bar</font>  <b>$pct%</b><br>" +
-                "<font color='#$mutedHex'>${formatRupees(spent)} of</font> " +
-                "<b>${formatRupees(budget)}</b><br>" +
-                summaryLine
+            heroText = if (remaining >= 0) formatRupees(remaining) else formatRupees(kotlin.math.abs(remaining))
+            labelText = if (remaining >= 0) "left ${period.remainingLabel}" else "over budget"
+            metaText = "${formatRupees(spent)} spent of ${formatRupees(budget)}"
+            statusText = when {
+                pct >= 100 -> "Over"
+                pct >= 85  -> "Tight"
+                pct >= 60  -> "Watch"
+                else       -> "Safe"
+            }
 
             progressMax = 100
             progressNow = pct
@@ -215,45 +210,96 @@ class BudgetNotificationService : Service() {
 
         val titleText    = HtmlCompat.fromHtml(titleHtml, HtmlCompat.FROM_HTML_MODE_COMPACT)
         val compactText  = HtmlCompat.fromHtml(compactHtml, HtmlCompat.FROM_HTML_MODE_COMPACT)
-        val expandedText = HtmlCompat.fromHtml(expandedHtml, HtmlCompat.FROM_HTML_MODE_COMPACT)
+        val compactView = budgetRemoteView(
+            layoutId = R.layout.notification_budget_compact,
+            title = period.label,
+            hero = heroText,
+            label = labelText,
+            meta = metaText,
+            status = statusText,
+            progressMax = progressMax,
+            progressNow = progressNow,
+            accentColor = accentColor,
+            addExpensePi = addExpensePi,
+            budgetPi = budgetPi,
+            cyclePi = cyclePi,
+            cycleLabel = period.next().label
+        )
+        val expandedView = budgetRemoteView(
+            layoutId = R.layout.notification_budget_expanded,
+            title = period.label,
+            hero = heroText,
+            label = labelText,
+            meta = metaText,
+            status = statusText,
+            progressMax = progressMax,
+            progressNow = progressNow,
+            accentColor = accentColor,
+            addExpensePi = addExpensePi,
+            budgetPi = budgetPi,
+            cyclePi = cyclePi,
+            cycleLabel = period.next().label
+        )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_budget_notif)
+            .setSmallIcon(R.drawable.ic_notification_blank)
             .setContentTitle(titleText)
             .setContentText(compactText)
-            .setSubText("Pocket Pulse")
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
+            .setWhen(0L)
+            .setUsesChronometer(false)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setColor(accentColor)
             .setColorized(false)
-            .setStyle(
-                NotificationCompat.BigTextStyle()
-                    .bigText(expandedText)
-                    .setBigContentTitle(titleText)
-                    .setSummaryText("Pocket Pulse")
-            )
+            .setCustomContentView(compactView)
+            .setCustomBigContentView(expandedView)
             .setContentIntent(openAppPi)
             .setDeleteIntent(restartPi)
-            .apply {
-                if (progressMax > 0) setProgress(progressMax, progressNow, false)
-                addAction(R.drawable.ic_notif_add,     "Add expense",          addExpensePi)
-                addAction(R.drawable.ic_notif_wallet,  "Budget",               budgetPi)
-                addAction(R.drawable.ic_notif_refresh, period.next().label,    cyclePi)
-            }
             .build()
             .apply {
                 flags = flags or Notification.FLAG_NO_CLEAR or Notification.FLAG_ONGOING_EVENT
             }
     }
 
-    private fun routePendingIntent(route: String, requestCode: Int): PendingIntent {
+    private fun budgetRemoteView(
+        layoutId: Int,
+        title: String,
+        hero: String,
+        label: String,
+        meta: String,
+        status: String,
+        progressMax: Int,
+        progressNow: Int,
+        accentColor: Int,
+        addExpensePi: PendingIntent,
+        budgetPi: PendingIntent,
+        cyclePi: PendingIntent,
+        cycleLabel: String
+    ): RemoteViews = RemoteViews(packageName, layoutId).apply {
+        setTextViewText(R.id.notif_title, title)
+        setTextViewText(R.id.notif_hero, hero)
+        setTextViewText(R.id.notif_label, label)
+        setTextViewText(R.id.notif_meta, meta)
+        setTextViewText(R.id.notif_status, status)
+        setTextColor(R.id.notif_status, accentColor)
+        setTextColor(R.id.notif_label, accentColor)
+        setProgressBar(R.id.notif_progress, progressMax.takeIf { it > 0 } ?: 100, progressNow, progressMax == 0)
+        setOnClickPendingIntent(R.id.notif_cta_add, addExpensePi)
+        setOnClickPendingIntent(R.id.notif_cta_budget, budgetPi)
+        setOnClickPendingIntent(R.id.notif_cta_cycle, cyclePi)
+        setTextViewText(R.id.notif_cta_cycle, cycleLabel)
+    }
+
+    private fun openAppPendingIntent(route: String? = null, requestCode: Int): PendingIntent {
         val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(MainActivity.EXTRA_NAV_ROUTE, route)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+            route?.let { putExtra(MainActivity.EXTRA_NAV_ROUTE, it) }
         }
         return PendingIntent.getActivity(
             this,
@@ -295,16 +341,17 @@ class BudgetNotificationService : Service() {
         return "$groupedHead,$tail"
     }
 
-    private fun progressBar(pct: Int): String {
-        val total = 12
-        val filled = (pct * total / 100).coerceIn(0, total)
-        return "▰".repeat(filled) + "▱".repeat(total - filled)
-    }
-
     private fun colorHex(@androidx.annotation.ColorRes res: Int): String {
         val argb = ContextCompat.getColor(this, res)
         return String.format("%06X", argb and 0xFFFFFF)
     }
+
+    private val BudgetPeriod.remainingLabel: String
+        get() = when (this) {
+            BudgetPeriod.DAILY -> "today"
+            BudgetPeriod.WEEKLY -> "this week"
+            BudgetPeriod.MONTHLY -> "this month"
+        }
 
     companion object {
         const val CHANNEL_ID = "budget_tracker_persistent"

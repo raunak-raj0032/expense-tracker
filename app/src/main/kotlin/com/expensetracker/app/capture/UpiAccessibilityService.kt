@@ -11,6 +11,8 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import com.expensetracker.app.R
 import com.expensetracker.app.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -37,7 +39,7 @@ class UpiAccessibilityService : AccessibilityService() {
         private const val KEEPALIVE_CHANNEL_ID = "upi_capture_keepalive"
         private const val KEEPALIVE_NOTIFICATION_ID = 4242
         private const val DEDUPE_WINDOW_MS = 60_000L
-        private const val MAX_TRAVERSAL_NODES = 400
+        private const val MAX_TRAVERSAL_NODES = 700
 
         private val SUPPORTED_PACKAGES = setOf(
             "com.google.android.apps.nbu.paisa.user",     // Google Pay (current)
@@ -51,7 +53,14 @@ class UpiAccessibilityService : AccessibilityService() {
             "com.dreamplug.androidapp",                   // CRED
             "com.mobikwik_new",                           // MobiKwik
             "com.freecharge.android",                     // Freecharge
-            "com.whatsapp"                                // WhatsApp Pay
+            "com.whatsapp",                               // WhatsApp Pay
+            "com.whatsapp.w4b",
+            "com.upi.axispay",                            // Axis Pay
+            "com.sbi.upi",                                // BHIM SBI Pay
+            "com.fss.unbipsp",                            // BHIM BOI UPI
+            "com.csam.icici.bank.imobile",
+            "com.axisbank.digibank",
+            "com.icici.bank.imobile"
         )
 
         private val SUCCESS_KEYWORDS = listOf(
@@ -61,12 +70,21 @@ class UpiAccessibilityService : AccessibilityService() {
             "transaction successful",
             "money sent",
             "payment complete",
+            "payment completed",
+            "payment sent",
             "successfully paid",
             "transfer successful",
+            "transfer completed",
             "received successfully",
+            "money received",
+            "amount debited",
+            "amount credited",
             "paid •",   // GPay post-payment "Paid • HH:MM" badge
             "paid ·",   // middle-dot variant
-            "debited from"
+            "debited from",
+            "credited to",
+            "utr",
+            "upi transaction id"
         )
     }
 
@@ -90,7 +108,7 @@ class UpiAccessibilityService : AccessibilityService() {
             Log.d("UpiCapture", "no root window for $pkg")
             return
         }
-        val collected = collectText(root) ?: return
+        val collected = collectText(root, event) ?: return
         if (collected.isBlank()) return
 
         val lower = collected.lowercase(Locale.ROOT)
@@ -101,7 +119,7 @@ class UpiAccessibilityService : AccessibilityService() {
         Log.d("UpiCapture", "match pkg=$pkg text=${collected.take(400)}")
 
         // Debounce repeats of the same screen text.
-        val fp = (pkg + "|" + collected).hashCode().toString()
+        val fp = (pkg + "|" + collected.lowercase(Locale.ROOT).replace(Regex("\\d{1,2}:\\d{2}"), "")).hashCode().toString()
         val now = System.currentTimeMillis()
         if (fp == lastFingerprint && now - lastFingerprintAt < DEDUPE_WINDOW_MS) return
         lastFingerprint = fp
@@ -124,8 +142,12 @@ class UpiAccessibilityService : AccessibilityService() {
         // No-op — nothing to cancel on screen.
     }
 
-    private fun collectText(root: AccessibilityNodeInfo): String? {
+    private fun collectText(root: AccessibilityNodeInfo, event: AccessibilityEvent): String? {
         val pieces = mutableListOf<String>()
+        event.text
+            .mapNotNull { it?.toString()?.takeIf(String::isNotBlank) }
+            .let(pieces::addAll)
+        event.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let(pieces::add)
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.addLast(root)
         var visited = 0
@@ -157,13 +179,23 @@ class UpiAccessibilityService : AccessibilityService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val appLabel = sourceAppName(packageName)
+        val accent = ContextCompat.getColor(this, R.color.budget_notification_accent)
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("New UPI payment detected")
-            .setContentText("Open Pocket Pulse to approve the $appLabel capture")
-            .setSmallIcon(android.R.drawable.ic_menu_save)
+            .setContentTitle("Payment ready to review")
+            .setContentText("$appLabel capture is waiting in Pocket Pulse")
+            .setSmallIcon(R.drawable.ic_capture_notif)
+            .setSubText("Pocket Pulse")
+            .setColor(accent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setAutoCancel(true)
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText("Review the $appLabel payment capture and approve it when the amount and merchant look right.")
+                    .setBigContentTitle("Payment ready to review")
+                    .setSummaryText("Pocket Pulse")
+            )
             .setContentIntent(pi)
             .build()
         nm.notify(eventId.toInt(), notification)
@@ -206,9 +238,11 @@ class UpiAccessibilityService : AccessibilityService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notification = NotificationCompat.Builder(this, KEEPALIVE_CHANNEL_ID)
-            .setContentTitle("UPI capture active")
-            .setContentText("Pocket Pulse is watching UPI apps for new payments")
-            .setSmallIcon(android.R.drawable.ic_menu_view)
+            .setContentTitle("UPI capture is on")
+            .setContentText("Watching payment screens quietly in the background")
+            .setSmallIcon(R.drawable.ic_capture_notif)
+            .setSubText("Pocket Pulse")
+            .setColor(ContextCompat.getColor(this, R.color.budget_notification_accent))
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)

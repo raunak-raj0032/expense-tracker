@@ -33,6 +33,13 @@ private data class MerchantHint(
     val category: String
 )
 
+private data class AmountCandidate(
+    val amountMinor: Long,
+    val start: Int,
+    val end: Int,
+    val score: Int
+)
+
 @Singleton
 class PaymentMessageParser @Inject constructor() {
 
@@ -49,6 +56,11 @@ class PaymentMessageParser @Inject constructor() {
             .normalizeWhitespace()
 
         if (combined.isBlank()) {
+            return ParseResult()
+        }
+
+        val lower = combined.lowercase(Locale.ROOT)
+        if (isFailedOrPendingPayment(lower)) {
             return ParseResult()
         }
 
@@ -186,8 +198,9 @@ class PaymentMessageParser @Inject constructor() {
     }
 
     private fun extractAmountMinor(text: String): Long? {
+        val candidates = mutableListOf<AmountCandidate>()
         for (pattern in amountPatterns) {
-            val match = pattern.find(text) ?: continue
+            for (match in pattern.findAll(text)) {
             val wholePart = match.groupValues[1].replace(",", "")
             val decimalPart = match.groupValues.getOrNull(2).orEmpty()
             val amount = buildString {
@@ -198,12 +211,36 @@ class PaymentMessageParser @Inject constructor() {
                 }
             }
 
-            return amount.toBigDecimalOrNull()
+                val amountMinor = amount.toBigDecimalOrNull()
                 ?.setScale(2, RoundingMode.HALF_UP)
                 ?.movePointRight(2)
                 ?.longValueExact()
+                    ?: continue
+
+                val contextStart = (match.range.first - 32).coerceAtLeast(0)
+                val contextEnd = (match.range.last + 33).coerceAtMost(text.length)
+                val context = text.substring(contextStart, contextEnd).lowercase(Locale.ROOT)
+                val score = amountContextScore(context)
+                if (score > Int.MIN_VALUE) {
+                    candidates += AmountCandidate(amountMinor, match.range.first, match.range.last, score)
+                }
+            }
         }
-        return null
+        return candidates
+            .maxWithOrNull(compareBy<AmountCandidate> { it.score }.thenBy { -it.start })
+            ?.amountMinor
+    }
+
+    private fun amountContextScore(context: String): Int {
+        if (balanceOnlyKeywords.any(context::contains) && transactionAmountKeywords.none(context::contains)) {
+            return Int.MIN_VALUE
+        }
+
+        var score = 0
+        if (transactionAmountKeywords.any(context::contains)) score += 4
+        if (paymentMethodKeywords.any(context::contains)) score += 2
+        if (balanceOnlyKeywords.any(context::contains)) score -= 3
+        return score
     }
 
     private fun extractReference(text: String): String? {
@@ -253,7 +290,7 @@ class PaymentMessageParser @Inject constructor() {
 
         value = value.replace(Regex("^(mr|mrs|ms|dr)\\.?\\s+", RegexOption.IGNORE_CASE), "")
         value = value.replace(
-            Regex("\\b(?:via|using|through|on|for|ref|utr|txn|transaction|upi|avl|available|a/c|acct)\\b.*$", RegexOption.IGNORE_CASE),
+            Regex("\\b(?:via|using|through|on|for|from|ref|utr|rrn|txn|transaction|upi|vpa|avl|available|a/c|acct|account|banking name|debited|credited|amount)\\b.*$", RegexOption.IGNORE_CASE),
             ""
         ).normalizeWhitespace()
 
@@ -356,6 +393,16 @@ class PaymentMessageParser @Inject constructor() {
             (lower.contains("wallet") || lower.contains("balance") || lower.contains("amazon pay"))
     }
 
+    private fun isFailedOrPendingPayment(lower: String): Boolean {
+        if (requestOnlyKeywords.any(lower::contains)) {
+            return true
+        }
+        if (incomeKeywords.any(lower::contains) && lower.contains("refund")) {
+            return false
+        }
+        return nonTransactionKeywords.any(lower::contains)
+    }
+
     private fun normalizeKey(value: String): String {
         return value.lowercase(Locale.ROOT)
             .replace(Regex("[^a-z0-9]+"), "")
@@ -366,30 +413,31 @@ class PaymentMessageParser @Inject constructor() {
 
     private companion object {
         val amountPatterns = listOf(
-            Regex("(?i)(?:\\u20B9|rs\\.?|inr)\\s*([0-9][0-9,]*)(?:\\.(\\d{1,2}))?"),
-            Regex("(?i)(?:amount|amt)\\s*(?:debited|credited|paid|spent|sent)?\\s*[:\\-]?\\s*([0-9][0-9,]*)(?:\\.(\\d{1,2}))?"),
-            Regex("(?i)([0-9][0-9,]*)(?:\\.(\\d{1,2}))?\\s*(?:rs\\.?|inr)")
+            Regex("(?i)(?:\\u20B9|rs\\.?|inr|rupees?)\\s*([0-9][0-9,]*)(?:\\.(\\d{1,2}))?\\s*(?:/-)?"),
+            Regex("(?i)(?:amount|amt|inr amount)\\s*(?:of)?\\s*(?:is|was)?\\s*(?:debited|credited|paid|spent|sent|received)?\\s*[:\\-]?\\s*(?:\\u20B9|rs\\.?|inr)?\\s*([0-9][0-9,]*)(?:\\.(\\d{1,2}))?"),
+            Regex("(?i)(?:debited|credited|paid|spent|sent|received|withdrawn|charged)\\s*(?:by|with|for|of)?\\s*(?:\\u20B9|rs\\.?|inr)?\\s*([0-9][0-9,]*)(?:\\.(\\d{1,2}))?"),
+            Regex("(?i)([0-9][0-9,]*)(?:\\.(\\d{1,2}))?\\s*(?:rs\\.?|inr|rupees?)")
         )
 
         val referencePatterns = listOf(
-            Regex("(?i)(?:upi\\s*ref(?:erence)?(?:\\s*no)?|utr|txn(?:\\s*id)?|ref(?:erence)?(?:\\s*no)?|order\\s*id)\\s*[:#\\-]?\\s*([A-Z0-9\\-]{6,})")
+            Regex("(?i)(?:upi\\s*ref(?:erence)?(?:\\s*(?:no|number))?|utr|rrn|txn(?:\\s*(?:id|no|number))?|transaction\\s*(?:id|no|number)|ref(?:erence)?(?:\\s*(?:no|number))?|order\\s*id)\\s*[:#\\-]?\\s*([A-Z0-9\\-]{6,})")
         )
 
         val partyPatterns = listOf(
-            Regex("(?i)paid to\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
-            Regex("(?i)payment to\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
-            Regex("(?i)sent to\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
+            Regex("(?i)(?:paid|paying|payment|sent|transfer(?:red)?|money sent)\\s+to\\s+([A-Za-z0-9@._&\\-'/ ]{2,60})"),
+            Regex("(?i)(?:to|bene(?:ficiary)?|recipient|merchant|payee)\\s*[:\\-]\\s*([A-Za-z0-9@._&\\-'/ ]{2,60})"),
             // PhonePe accessibility screens: "Banking name: SATYAM SAHIL"
             Regex("(?i)banking name:?\\s+([A-Za-z][A-Za-z0-9 .&\\-']{1,49})"),
             // UPI VPAs: "satyamsahil@oksbi" — use the handle as the party name
             Regex("([A-Za-z][A-Za-z0-9._\\-]{2,40})@[a-z]{2,20}"),
             Regex("(?i)transferred to\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
-            Regex("(?i)received from\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
-            Regex("(?i)from\\s+([A-Za-z0-9@._&\\- ]{2,50})\\s+(?:via|through|using|on|for)"),
-            Regex("(?i)to\\s+([A-Za-z0-9@._&\\- ]{2,50})\\s+(?:via|through|using|on|for|ref|utr|upi)"),
-            Regex("(?i)(?:spent|purchase(?:d)?|payment|order)\\s+(?:at|on)\\s+([A-Za-z0-9@._&\\- ]{2,50})"),
-            Regex("(?i)(?:at|towards)\\s+([A-Za-z0-9@._&\\- ]{2,60})\\s+(?:on|using|via|ref|utr|upi|txn)"),
-            Regex("(?i)merchant\\s*[:\\-]\\s*([A-Za-z0-9@._&\\- ]{2,50})"),
+            Regex("(?i)(?:received|credited)\\s+from\\s+([A-Za-z0-9@._&\\-'/ ]{2,60})"),
+            Regex("(?i)from\\s+([A-Za-z0-9@._&\\-'/ ]{2,60})\\s+(?:via|through|using|on|for|upi|ref|utr|rrn)"),
+            Regex("(?i)to\\s+([A-Za-z0-9@._&\\-'/ ]{2,60})\\s+(?:via|through|using|on|for|ref|utr|rrn|upi)"),
+            Regex("(?i)(?:spent|purchase(?:d)?|payment|order)\\s+(?:at|on|towards)\\s+([A-Za-z0-9@._&\\-'/ ]{2,60})"),
+            Regex("(?i)(?:at|towards)\\s+([A-Za-z0-9@._&\\-'/ ]{2,60})\\s+(?:on|using|via|ref|utr|rrn|upi|txn)"),
+            Regex("(?i)(?:info|remarks|narration)\\s*[:\\-]\\s*(?:upi|p2a|p2m|imps|neft|rtgs)?[\\-/ ]*([A-Za-z0-9@._&\\-'/ ]{2,60})"),
+            Regex("(?i)merchant\\s*[:\\-]\\s*([A-Za-z0-9@._&\\-'/ ]{2,60})"),
             Regex("(?i)vpa\\s*[:\\-]\\s*([A-Za-z0-9._\\-]+@[A-Za-z0-9._\\-]+)")
         )
 
@@ -405,7 +453,13 @@ class PaymentMessageParser @Inject constructor() {
             "payment made",
             "successful payment",
             "paid via",
-            "spent at"
+            "spent at",
+            "amount debited",
+            "debit of",
+            "debit transaction",
+            "you paid",
+            "you sent",
+            "money sent"
         )
 
         val incomeKeywords = listOf(
@@ -417,7 +471,12 @@ class PaymentMessageParser @Inject constructor() {
             "reversal",
             "cashback",
             "settled",
-            "paid you"
+            "paid you",
+            "has sent you",
+            "money received",
+            "amount credited",
+            "credit of",
+            "credit transaction"
         )
 
         val transferKeywords = listOf(
@@ -432,6 +491,61 @@ class PaymentMessageParser @Inject constructor() {
             "amazon pay balance loaded",
             "load money",
             "balance transfer"
+        )
+
+        val transactionAmountKeywords = listOf(
+            "paid",
+            "debited",
+            "credited",
+            "spent",
+            "sent",
+            "received",
+            "withdrawn",
+            "charged",
+            "purchase",
+            "amount",
+            "amt",
+            "transaction"
+        )
+
+        val paymentMethodKeywords = listOf(
+            "upi",
+            "vpa",
+            "utr",
+            "rrn",
+            "txn",
+            "card",
+            "imps",
+            "neft",
+            "rtgs",
+            "wallet"
+        )
+
+        val balanceOnlyKeywords = listOf(
+            "avl bal",
+            "available balance",
+            "current balance",
+            "ledger balance",
+            "bal:"
+        )
+
+        val nonTransactionKeywords = listOf(
+            "payment failed",
+            "transaction failed",
+            "payment declined",
+            "transaction declined",
+            "payment pending",
+            "transaction pending",
+            "mandate request",
+            "otp",
+            "one time password"
+        )
+
+        val requestOnlyKeywords = listOf(
+            "request received",
+            "collect request",
+            "payment request",
+            "approve with upi pin"
         )
 
         val walletTopUpKeywords = listOf(

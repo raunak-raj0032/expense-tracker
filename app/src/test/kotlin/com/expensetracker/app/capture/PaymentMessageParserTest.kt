@@ -2,6 +2,7 @@ package com.expensetracker.app.capture
 
 import com.expensetracker.app.core.model.TransactionType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -88,5 +89,49 @@ class PaymentMessageParserTest {
         assertEquals("Amazon Pay Balance", result.merchant)
         assertEquals("Transfer", result.categoryHint)
         assertEquals("Wallet", result.paymentMethod)
+    }
+
+    @Test
+    fun parsesBankDebitSmsWithAvailableBalance() {
+        val result = parser.parse(
+            sender = "VK-HDFCBK",
+            text = "Alert: A/c XX1234 debited by Rs.1,234.56 at ZOMATO on 07-May-26. UTR 612345678901. Avl Bal Rs.9,876.00"
+        )
+
+        assertTrue(result.isTransaction)
+        assertEquals(123_456L, result.amountMinor)
+        assertEquals(TransactionType.EXPENSE, result.direction)
+        assertEquals("Zomato", result.merchant)
+        assertEquals("Food", result.categoryHint)
+        assertEquals("612345678901", result.reference)
+    }
+
+    @Test
+    fun parsesUpiAccessibilitySuccessScreen() {
+        val result = parser.parse(
+            packageName = "com.phonepe.app",
+            text = "Payment successful ₹75 Paid to Fresh Mart Banking name: FRESH MART INDIA UPI transaction ID 612345678901"
+        )
+
+        assertTrue(result.isTransaction)
+        assertEquals(7_500L, result.amountMinor)
+        assertEquals(TransactionType.EXPENSE, result.direction)
+        assertEquals("Fresh Mart", result.merchant)
+        assertEquals("UPI", result.paymentMethod)
+        assertEquals("612345678901", result.reference)
+    }
+
+    @Test
+    fun ignoresFailedOrPendingPaymentRequests() {
+        val failed = parser.parse(
+            packageName = "com.google.android.apps.nbu.paisa.user",
+            text = "Payment failed for ₹250 to Rahul Sharma. Please try again."
+        )
+        val collectRequest = parser.parse(
+            text = "Collect request received from shop@upi for INR 400. Approve with UPI PIN."
+        )
+
+        assertFalse(failed.isTransaction)
+        assertFalse(collectRequest.isTransaction)
     }
 }
