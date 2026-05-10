@@ -131,11 +131,11 @@ private fun fullAssetPath(mood: PiggyMood): String? =
         PiggyMood.Cheer -> "mascot/emotions/full/penny_cheer.png"
         PiggyMood.Wink -> "mascot/emotions/full/penny_wink.png"
         PiggyMood.Coin -> "mascot/emotions/full/penny_coin.png"
-        PiggyMood.Sleepy,
-        PiggyMood.Curious,
-        PiggyMood.Love,
-        PiggyMood.Excited,
-        PiggyMood.Surprised -> null
+        PiggyMood.Sleepy -> "mascot/emotions/full/penny_sleepy.png"
+        PiggyMood.Curious -> "mascot/emotions/full/penny_curious.png"
+        PiggyMood.Love -> "mascot/emotions/full/penny_love.png"
+        PiggyMood.Excited -> "mascot/emotions/full/penny_excited.png"
+        PiggyMood.Surprised -> "mascot/emotions/full/penny_surprised.png"
     }
 
 private fun halfCutAssetPath(mood: PiggyMood): String? =
