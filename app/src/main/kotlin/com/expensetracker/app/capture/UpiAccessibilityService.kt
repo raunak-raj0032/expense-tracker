@@ -6,6 +6,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -183,7 +184,8 @@ class UpiAccessibilityService : AccessibilityService() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Payment ready to review")
             .setContentText("$appLabel capture is waiting in Pocket Pulse")
-            .setSmallIcon(R.drawable.ic_capture_notif)
+            .setSmallIcon(R.drawable.ic_budget_notif)
+            .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.ic_notification_pig))
             .setSubText("Pocket Pulse")
             .setColor(accent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -240,7 +242,8 @@ class UpiAccessibilityService : AccessibilityService() {
         val notification = NotificationCompat.Builder(this, KEEPALIVE_CHANNEL_ID)
             .setContentTitle("UPI capture is on")
             .setContentText("Watching payment screens quietly in the background")
-            .setSmallIcon(R.drawable.ic_capture_notif)
+            .setSmallIcon(R.drawable.ic_budget_notif)
+            .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.ic_notification_pig))
             .setSubText("Pocket Pulse")
             .setColor(ContextCompat.getColor(this, R.color.budget_notification_accent))
             .setPriority(NotificationCompat.PRIORITY_MIN)

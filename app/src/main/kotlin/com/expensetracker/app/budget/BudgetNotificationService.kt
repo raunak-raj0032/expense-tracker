@@ -12,6 +12,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.IBinder
 import android.widget.RemoteViews
@@ -242,7 +243,8 @@ class BudgetNotificationService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_blank)
+            .setSmallIcon(R.drawable.ic_budget_notif)
+            .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.ic_notification_pig))
             .setContentTitle(titleText)
             .setContentText(compactText)
             .setOngoing(true)
