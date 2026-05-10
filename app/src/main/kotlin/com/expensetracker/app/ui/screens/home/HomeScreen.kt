@@ -151,7 +151,7 @@ fun HomeScreen(
                     TextButton(onClick = onViewLedger) {
                         Text("Ledger", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                     }
-                    // Profile avatar
+                    
                     Box(
                         modifier = Modifier
                             .padding(end = 8.dp)
@@ -387,12 +387,12 @@ fun MonthlySummaryCard(
         todayExpense > todayBudgetAllowance -> "Too fast"
         else -> "Steady"
     }
-    // Hero card — dramatic net flow display
+    
     GlassPanel(
         modifier = modifier.fillMaxWidth(),
         accent   = MaterialTheme.colorScheme.primary
     ) {
-        // Header row
+        
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -411,7 +411,7 @@ fun MonthlySummaryCard(
 
         AccentDivider(accent = MaterialTheme.colorScheme.primary)
 
-        // Big net-flow hero number
+        
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 text  = "NET FLOW",
@@ -432,7 +432,7 @@ fun MonthlySummaryCard(
             )
         }
 
-        // Spent / Received / Pace row
+        
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -460,7 +460,7 @@ fun MonthlySummaryCard(
             )
         }
 
-        // Streak + Coverage stat row
+        
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -483,7 +483,7 @@ fun MonthlySummaryCard(
             )
         }
 
-        // Budget section
+        
         if (budgetRemaining != null && budgetTotal != null && budgetTotal > 0 && todayBudgetAllowance != null) {
             BudgetProgressSection(
                 totalExpense         = totalExpense,
@@ -611,9 +611,13 @@ private fun BudgetProgressSection(
     dayOfMonth: Int,
     daysInMonth: Int
 ) {
-    val todayRemaining  = todayBudgetAllowance - todayExpense
-    val monthHeadline   = formatAmount(abs(budgetRemaining))
-    val todayHeadline   = formatAmount(abs(todayRemaining))
+    var viewMode by remember { mutableStateOf(BudgetViewMode.MONTHLY) }
+
+    val weeklyBudget = (budgetTotal / 4)
+    val currentWeek = ((dayOfMonth - 1) / 7) + 1
+    val daysIntoWeek = ((dayOfMonth - 1) % 7) + 1
+    val weeklySpent = (totalExpense * 7 / daysInMonth)
+    val weeklyAllowance = todayBudgetAllowance * 7
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
@@ -625,10 +629,27 @@ private fun BudgetProgressSection(
                 Text("BUDGET PACE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.0.sp)
                 Text("Month & daily guidance", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             }
-            NeonPill(
-                text   = "${formatAverageAmount(budgetTotal, daysInMonth)}/day",
-                accent = MaterialTheme.colorScheme.secondary
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text  = if (viewMode == BudgetViewMode.MONTHLY) "Monthly" else "Weekly",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                IconButton(
+                    onClick = { viewMode = if (viewMode == BudgetViewMode.MONTHLY) BudgetViewMode.WEEKLY else BudgetViewMode.MONTHLY },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = "Toggle view",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
         }
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -639,29 +660,52 @@ private fun BudgetProgressSection(
                 verticalArrangement   = Arrangement.spacedBy(8.dp),
                 maxItemsInEachRow     = layout.columns
             ) {
-                BudgetPaceCard(
-                    label      = budgetName ?: "Month budget",
-                    headline   = monthHeadline,
-                    status     = if (budgetRemaining >= 0) "Remaining" else "Over",
-                    supporting = "${formatAmount(totalExpense)} of ${formatAmount(budgetTotal)} spent",
-                    progress   = (totalExpense.toFloat() / budgetTotal.toFloat()).coerceIn(0f, 1f),
-                    accent     = if (budgetRemaining < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
-                    modifier   = Modifier.fillMaxWidth(layout.itemFraction)
-                )
-                BudgetPaceCard(
-                    label      = "Daily allowance",
-                    headline   = todayHeadline,
-                    status     = if (todayRemaining >= 0) "Left today" else "Over",
-                    supporting = "Day $dayOfMonth/$daysInMonth · ${formatAmount(todayExpense)} spent",
-                    progress   = if (todayBudgetAllowance > 0)
-                        (todayExpense.toFloat() / todayBudgetAllowance.toFloat()).coerceIn(0f, 1f) else 0f,
-                    accent     = if (todayRemaining < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                    modifier   = Modifier.fillMaxWidth(layout.itemFraction)
-                )
+                if (viewMode == BudgetViewMode.MONTHLY) {
+                    BudgetPaceCard(
+                        label      = budgetName ?: "Month budget",
+                        headline   = formatAmount(abs(budgetRemaining)),
+                        status     = if (budgetRemaining >= 0) "Remaining" else "Over",
+                        supporting = "${formatAmount(totalExpense)} of ${formatAmount(budgetTotal)} spent",
+                        progress   = (totalExpense.toFloat() / budgetTotal.toFloat()).coerceIn(0f, 1f),
+                        accent     = if (budgetRemaining < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
+                        modifier   = Modifier.fillMaxWidth(layout.itemFraction)
+                    )
+                    BudgetPaceCard(
+                        label      = "Daily allowance",
+                        headline   = formatAmount(abs(todayBudgetAllowance - todayExpense)),
+                        status     = if (todayBudgetAllowance - todayExpense >= 0) "Left today" else "Over",
+                        supporting = "Day $dayOfMonth/$daysInMonth · ${formatAmount(todayExpense)} spent",
+                        progress   = if (todayBudgetAllowance > 0)
+                            (todayExpense.toFloat() / todayBudgetAllowance.toFloat()).coerceIn(0f, 1f) else 0f,
+                        accent     = if (todayBudgetAllowance - todayExpense < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        modifier   = Modifier.fillMaxWidth(layout.itemFraction)
+                    )
+                } else {
+                    BudgetPaceCard(
+                        label      = "Week $currentWeek",
+                        headline   = formatAmount(abs(weeklyBudget - weeklySpent)),
+                        status     = if (weeklyBudget >= weeklySpent) "Remaining" else "Over",
+                        supporting = "${formatAmount(weeklySpent)} of ${formatAmount(weeklyBudget)} spent",
+                        progress   = if (weeklyBudget > 0) (weeklySpent.toFloat() / weeklyBudget.toFloat()).coerceIn(0f, 1f) else 0f,
+                        accent     = if (weeklyBudget < weeklySpent) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
+                        modifier   = Modifier.fillMaxWidth(layout.itemFraction)
+                    )
+                    BudgetPaceCard(
+                        label      = "Daily this week",
+                        headline   = formatAmount(abs(weeklyAllowance / 7 - todayExpense)),
+                        status     = if (weeklyAllowance / 7 >= todayExpense) "Left today" else "Over",
+                        supporting = "Day $daysIntoWeek of week · ${formatAmount(todayExpense)} spent",
+                        progress   = if (weeklyAllowance > 0) (todayExpense * 7.toFloat() / weeklyAllowance.toFloat()).coerceIn(0f, 1f) else 0f,
+                        accent     = if (weeklyAllowance / 7 < todayExpense) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        modifier   = Modifier.fillMaxWidth(layout.itemFraction)
+                    )
+                }
             }
         }
     }
 }
+
+private enum class BudgetViewMode { MONTHLY, WEEKLY }
 
 @Composable
 private fun BudgetPaceCard(
@@ -869,7 +913,7 @@ fun TransactionListItem(
                 onLongClick = onLongClick
             )
     ) {
-        // Left accent stripe
+        
         Box(
             modifier = Modifier
                 .width(3.dp)
