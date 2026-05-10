@@ -1,12 +1,10 @@
 package com.expensetracker.app.ui.mascot
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -28,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -37,7 +36,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,11 +52,13 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 enum class TutorialTarget {
     MonthlySummary,
@@ -70,6 +70,7 @@ enum class TutorialTarget {
 private data class TutorialStep(
     val mood: PiggyMood,
     val assetSet: PennyAssetSet,
+    val title: String,
     val line: String,
     val target: TutorialTarget?,
     val nextLabel: String,
@@ -79,46 +80,59 @@ private val tutorialSteps = listOf(
     TutorialStep(
         mood = PiggyMood.Wave,
         assetSet = PennyAssetSet.HalfCut,
-        line = "Hi! I'm Penny, your money buddy. Let me show you around in 30 seconds.",
+        title = "Hey there!",
+        line = "I'm Penny, your money buddy. Let me show you around in 30 seconds.",
         target = null,
         nextLabel = "Sounds good"
     ),
     TutorialStep(
         mood = PiggyMood.Curious,
         assetSet = PennyAssetSet.HalfCut,
-        line = "This is your monthly snapshot: spent, earned, pacing, and what is left for the month.",
+        title = "Your month at a glance",
+        line = "Spent, earned, pacing, and what's left for the month — all right here.",
         target = TutorialTarget.MonthlySummary,
         nextLabel = "Got it"
     ),
     TutorialStep(
         mood = PiggyMood.Excited,
         assetSet = PennyAssetSet.HalfCut,
-        line = "These shortcuts open budgets, smart capture, statements, and manual entry without digging through menus.",
+        title = "One-tap shortcuts",
+        line = "Open budgets, smart capture, statements, and manual entry without digging through menus.",
         target = TutorialTarget.QuickActions,
         nextLabel = "Nice"
     ),
     TutorialStep(
         mood = PiggyMood.Coin,
         assetSet = PennyAssetSet.Full,
-        line = "Use the plus button when you want to add a transaction yourself.",
+        title = "Add it yourself",
+        line = "Tap the plus button whenever you want to log a transaction by hand.",
         target = TutorialTarget.AddButton,
         nextLabel = "Cool"
     ),
     TutorialStep(
         mood = PiggyMood.Wink,
         assetSet = PennyAssetSet.HalfCut,
-        line = "The bottom tabs take you between Home, Ledger, Calendar, Analytics, and Settings.",
+        title = "Find your way",
+        line = "The bottom tabs hop between Home, Ledger, Calendar, Analytics, and Settings.",
         target = TutorialTarget.BottomBar,
         nextLabel = "Okay"
     ),
     TutorialStep(
         mood = PiggyMood.Cheer,
         assetSet = PennyAssetSet.HalfCut,
+        title = "All set!",
         line = "That's the tour. You can replay it from Settings any time.",
         target = null,
         nextLabel = "Let's go"
     ),
 )
+
+private val MintAccent = Color(0xFF00E5A0)
+private val MintAccentDeep = Color(0xFF00B786)
+private val BubbleTop = Color(0xFFFFFFFF)
+private val BubbleBottom = Color(0xFFEAFFF6)
+private val InkPrimary = Color(0xFF0F1F1A)
+private val InkMuted = Color(0xFF4A6B5F)
 
 @Composable
 fun TutorialOverlay(
@@ -141,11 +155,12 @@ fun TutorialOverlay(
         val heightPx = constraints.maxHeight.toFloat()
         val spotlightRect = spotlightRect(current.target, targetBounds, widthPx, heightPx)
         val horizontalPadding = if (maxWidth < 360.dp) 16.dp else 20.dp
-        val maxBubbleWidth = minOf(maxWidth - horizontalPadding - horizontalPadding, 340.dp)
+        val maxBubbleWidth = minOf(maxWidth - horizontalPadding - horizontalPadding, 360.dp)
         val placement = tutorialPlacement(current.target, spotlightRect, widthPx, heightPx)
 
         SpotlightScrim(rect = spotlightRect)
         if (spotlightRect != null) {
+            SpotlightHalo(rect = spotlightRect)
             SpotlightPulse(rect = spotlightRect)
         }
 
@@ -158,26 +173,8 @@ fun TutorialOverlay(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                tutorialSteps.indices.forEach { index ->
-                    Box(
-                        modifier = Modifier
-                            .size(if (index == step) 24.dp else 8.dp, 8.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(
-                                if (index == step) MaterialTheme.colorScheme.primary
-                                else Color.White.copy(alpha = 0.35f)
-                            )
-                    )
-                }
-            }
-            TextButton(onClick = onFinish) {
-                Text(
-                    "Skip",
-                    color = Color.White.copy(alpha = 0.88f),
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+            StepDots(total = tutorialSteps.size, current = step)
+            SkipPill(onClick = onFinish)
         }
 
         Column(
@@ -198,35 +195,103 @@ fun TutorialOverlay(
             ) { stepNow ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     SpeechBubble(
+                        title = stepNow.title,
                         text = stepNow.line,
+                        tailDown = placement.bubbleTailDown,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(if (placement.bubbleTailDown) 14.dp else 8.dp))
                     Piggy(
                         mood = stepNow.mood,
-                        size = if (stepNow.assetSet == PennyAssetSet.Full) 132.dp else 104.dp,
+                        size = if (stepNow.assetSet == PennyAssetSet.Full) 138.dp else 112.dp,
                         assetSet = stepNow.assetSet
                     )
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
 
-            Button(
-                onClick = {
-                    if (step < tutorialSteps.lastIndex) step++ else onFinish()
-                },
-                modifier = Modifier
-                    .widthIn(min = 168.dp)
-                    .height(50.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text(current.nextLabel, fontWeight = FontWeight.SemiBold)
+            NextButton(label = current.nextLabel, isLast = step == tutorialSteps.lastIndex) {
+                if (step < tutorialSteps.lastIndex) step++ else onFinish()
             }
         }
+    }
+}
+
+@Composable
+private fun StepDots(total: Int, current: Int) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color.White.copy(alpha = 0.10f))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(total) { index ->
+            val active = index == current
+            Box(
+                modifier = Modifier
+                    .size(width = if (active) 22.dp else 7.dp, height = 7.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(
+                        if (active) Brush.horizontalGradient(listOf(MintAccent, MintAccentDeep))
+                        else Brush.horizontalGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.35f),
+                                Color.White.copy(alpha = 0.35f)
+                            )
+                        )
+                    )
+            )
+        }
+    }
+}
+
+@Composable
+private fun SkipPill(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color.White.copy(alpha = 0.12f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text(
+            "Skip",
+            color = Color.White.copy(alpha = 0.92f),
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp
+        )
+    }
+}
+
+@Composable
+private fun NextButton(label: String, isLast: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .shadow(
+                elevation = 14.dp,
+                shape = RoundedCornerShape(18.dp),
+                ambientColor = MintAccent,
+                spotColor = MintAccent
+            )
+            .clip(RoundedCornerShape(18.dp))
+            .background(
+                Brush.horizontalGradient(
+                    if (isLast) listOf(Color(0xFF00F0B2), Color(0xFF00B786))
+                    else listOf(MintAccent, MintAccentDeep)
+                )
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 28.dp, vertical = 14.dp)
+    ) {
+        Text(
+            label,
+            color = Color(0xFF052017),
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp
+        )
     }
 }
 
@@ -237,7 +302,16 @@ private fun SpotlightScrim(rect: Rect?) {
             .fillMaxSize()
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
     ) {
-        drawRect(Color.Black.copy(alpha = 0.78f))
+        // Rich vertical-gradient scrim instead of flat black for more depth.
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF06120E).copy(alpha = 0.86f),
+                    Color(0xFF0A1F18).copy(alpha = 0.82f),
+                    Color(0xFF06120E).copy(alpha = 0.88f)
+                )
+            )
+        )
         rect ?: return@Canvas
         drawRoundRect(
             color = Color.Transparent,
@@ -250,31 +324,79 @@ private fun SpotlightScrim(rect: Rect?) {
 }
 
 @Composable
+private fun SpotlightHalo(rect: Rect) {
+    // Soft radial glow around the spotlight to draw the eye in.
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val cx = rect.center.x
+        val cy = rect.center.y
+        val radius = (maxOf(rect.width, rect.height) * 0.85f)
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    MintAccent.copy(alpha = 0.22f),
+                    MintAccent.copy(alpha = 0.08f),
+                    Color.Transparent
+                ),
+                center = Offset(cx, cy),
+                radius = radius
+            ),
+            center = Offset(cx, cy),
+            radius = radius
+        )
+    }
+}
+
+@Composable
 private fun SpotlightPulse(rect: Rect) {
-    val transition = rememberInfiniteTransition(label = "pulse")
-    val pulse by transition.animateFloat(
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "pulse")
+    val pulse1 by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
+            animation = tween(1800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "pulse"
+        label = "pulse1"
+    )
+    val pulse2 by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = FastOutSlowInEasing, delayMillis = 600),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulse2"
     )
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val grow = 12f * pulse
+        // Outer pulses (two rings, phase-offset)
+        listOf(pulse1, pulse2).forEach { p ->
+            val grow = 22f * p
+            drawRoundRect(
+                color = MintAccent.copy(alpha = (1f - p) * 0.55f),
+                topLeft = Offset(rect.left - grow, rect.top - grow),
+                size = Size(rect.width + grow * 2, rect.height + grow * 2),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(28f + grow, 28f + grow),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.4f)
+            )
+        }
+        // Crisp inner outline with gradient stroke
         drawRoundRect(
-            color = Color(0xFF00E5A0).copy(alpha = (1f - pulse) * 0.7f),
-            topLeft = Offset(rect.left - grow, rect.top - grow),
-            size = Size(rect.width + grow * 2, rect.height + grow * 2),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(28f + grow, 28f + grow),
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f)
-        )
-        drawRoundRect(
-            color = Color(0xFF00E5A0).copy(alpha = 0.9f),
+            brush = Brush.linearGradient(
+                colors = listOf(MintAccent, Color(0xFF7CFFD4), MintAccentDeep),
+                start = Offset(rect.left, rect.top),
+                end = Offset(rect.right, rect.bottom)
+            ),
             topLeft = Offset(rect.left, rect.top),
             size = Size(rect.width, rect.height),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(28f, 28f),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.5f)
+        )
+        // Soft inner glow tracing the inside edge
+        drawRoundRect(
+            color = MintAccent.copy(alpha = 0.25f),
+            topLeft = Offset(rect.left + 3f, rect.top + 3f),
+            size = Size(rect.width - 6f, rect.height - 6f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(26f, 26f),
             style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f)
         )
     }
@@ -283,6 +405,7 @@ private fun SpotlightPulse(rect: Rect) {
 private data class TutorialPlacement(
     val alignment: Alignment,
     val padding: PaddingValues,
+    val bubbleTailDown: Boolean,
 )
 
 private fun tutorialPlacement(
@@ -305,13 +428,16 @@ private fun tutorialPlacement(
         else -> 0.dp
     }
     val bottom = when (alignment) {
-        Alignment.BottomCenter -> 108.dp
+        Alignment.BottomCenter -> 116.dp
         Alignment.Center -> 24.dp
         else -> 24.dp
     }
+    // Tail points DOWN (toward the spotlight) when the bubble sits ABOVE its target.
+    val tailDown = alignment == Alignment.BottomCenter
     return TutorialPlacement(
         alignment = alignment,
-        padding = PaddingValues(top = top, bottom = bottom)
+        padding = PaddingValues(top = top, bottom = bottom),
+        bubbleTailDown = tailDown
     )
 }
 
@@ -366,31 +492,129 @@ private fun fallbackRect(target: TutorialTarget, width: Float, height: Float): R
 
 @Composable
 private fun SpeechBubble(
+    title: String,
     text: String,
+    tailDown: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier
-            .shadow(elevation = 8.dp, shape = RoundedCornerShape(20.dp))
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color.White, Color(0xFFF0FFF9))
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(
+                    elevation = 18.dp,
+                    shape = RoundedCornerShape(24.dp),
+                    ambientColor = MintAccent,
+                    spotColor = MintAccent.copy(alpha = 0.6f)
+                )
+                .clip(RoundedCornerShape(24.dp))
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(BubbleTop, BubbleBottom)
+                    )
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            MintAccent.copy(alpha = 0.55f),
+                            MintAccent.copy(alpha = 0.18f)
+                        )
+                    ),
+                    shape = RoundedCornerShape(24.dp)
+                )
+        ) {
+            // Top accent bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            listOf(MintAccent, Color(0xFF7CFFD4), MintAccentDeep)
+                        )
+                    )
+            )
+            Column(
+                modifier = Modifier.padding(
+                    start = 22.dp,
+                    end = 22.dp,
+                    top = 18.dp,
+                    bottom = 18.dp
                 ),
-                shape = RoundedCornerShape(20.dp)
-            )
-            .border(
-                width = 1.dp,
-                color = Color(0xFF00E5A0).copy(alpha = 0.45f),
-                shape = RoundedCornerShape(20.dp)
-            )
-            .padding(horizontal = 18.dp, vertical = 12.dp)
+                horizontalAlignment = Alignment.Start
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(MintAccentDeep)
+                    )
+                    Text(
+                        text = "PENNY SAYS",
+                        color = MintAccentDeep,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        letterSpacing = 1.5.sp
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = title,
+                    color = InkPrimary,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 17.sp,
+                    lineHeight = 22.sp
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = InkMuted,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Start,
+                    lineHeight = 20.sp
+                )
+            }
+        }
+        if (tailDown) {
+            BubbleTail(pointingDown = true)
+        }
+    }
+}
+
+@Composable
+private fun BubbleTail(pointingDown: Boolean) {
+    // A small triangle anchored to the bottom of the bubble.
+    Canvas(
+        modifier = Modifier
+            .offset(y = (-1).dp)
+            .size(width = 22.dp, height = 12.dp)
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = Color(0xFF1B0F1F),
-            textAlign = TextAlign.Center
+        val w = size.width
+        val h = size.height
+        val path = Path().apply {
+            if (pointingDown) {
+                moveTo(0f, 0f)
+                lineTo(w, 0f)
+                lineTo(w / 2f, h)
+                close()
+            } else {
+                moveTo(w / 2f, 0f)
+                lineTo(0f, h)
+                lineTo(w, h)
+                close()
+            }
+        }
+        drawPath(path = path, color = BubbleBottom)
+        drawPath(
+            path = path,
+            color = MintAccent.copy(alpha = 0.45f),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f)
         )
     }
 }
