@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.security.SecureRandom
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -44,8 +43,8 @@ class BackupRepository @Inject constructor(
     private val deviceIdProvider: DeviceIdProvider
 ) {
     suspend fun exportBackup(): String = withContext(Dispatchers.IO) {
-        val email = prefs.backupEmail.first().trim()
-        require(email.isNotEmpty()) { "Set a backup email before exporting." }
+        val email = currentUserEmail()
+        require(email.isNotEmpty()) { "Sign in to export a backup." }
 
         JSONObject()
             .put("version", BACKUP_VERSION)
@@ -90,15 +89,6 @@ class BackupRepository @Inject constructor(
                 "Budgets" to root.optJSONArray("budgets").lengthOrZero()
             )
         )
-    }
-
-    suspend fun generateVerificationCode(rawJson: String): String = withContext(Dispatchers.IO) {
-        val preview = previewBackup(rawJson)
-        val configuredEmail = prefs.backupEmail.first().trim()
-        require(configuredEmail.equals(preview.backupEmail, ignoreCase = true)) {
-            "This backup belongs to ${preview.backupEmail}. Set that email here before restoring on a different device."
-        }
-        SecureRandom().nextInt(1_000_000).toString().padStart(6, '0')
     }
 
     suspend fun restoreBackup(rawJson: String, mode: RestoreMode) = withContext(Dispatchers.IO) {
@@ -276,13 +266,17 @@ class BackupRepository @Inject constructor(
         }
     }
 
+    private suspend fun currentUserEmail(): String {
+        val state = authRepository.authState.first()
+        return (state as? AuthState.SignedIn)?.user?.email?.trim().orEmpty()
+    }
+
     private suspend fun requireCurrentUserEmailMatches(backupEmail: String) {
         require(backupEmail.isNotBlank()) { "Backup file is missing its backup email." }
-        val state = authRepository.authState.first()
-        val userEmail = (state as? AuthState.SignedIn)?.user?.email?.trim().orEmpty()
-        require(userEmail.isNotBlank()) { "Sign in with the backup email before importing this backup." }
+        val userEmail = currentUserEmail()
+        require(userEmail.isNotBlank()) { "Sign in with $backupEmail to restore this backup." }
         require(userEmail.equals(backupEmail.trim(), ignoreCase = true)) {
-            "This backup belongs to $backupEmail. Sign in as $backupEmail to import it."
+            "This backup belongs to $backupEmail. Sign in as $backupEmail to restore it."
         }
     }
 

@@ -39,7 +39,6 @@ class UserPreferences @Inject constructor(
     private val budgetWidgetPeriodKey = stringPreferencesKey("budget_widget_period")
     private val firstRunPermissionsPromptedKey = booleanPreferencesKey("first_run_permissions_prompted")
     private val tutorialSeenKey = booleanPreferencesKey("tutorial_seen")
-    private val backupEmailKey = stringPreferencesKey("backup_email")
     private val profilePicturePathKey = stringPreferencesKey("profile_picture_path")
 
     val onboardingSeen: Flow<Boolean> = context.userPrefsDataStore.data.map { it[onboardingKey] ?: false }
@@ -52,7 +51,6 @@ class UserPreferences @Inject constructor(
         context.userPrefsDataStore.data.map { it[firstRunPermissionsPromptedKey] ?: false }
     val tutorialSeen: Flow<Boolean> =
         context.userPrefsDataStore.data.map { it[tutorialSeenKey] ?: false }
-    val backupEmail: Flow<String> = context.userPrefsDataStore.data.map { it[backupEmailKey].orEmpty() }
     val profilePicturePath: Flow<String> = context.userPrefsDataStore.data.map { it[profilePicturePathKey].orEmpty() }
 
     val aiModelState: Flow<AiModelState> = context.userPrefsDataStore.data.map { prefs ->
@@ -123,17 +121,6 @@ class UserPreferences @Inject constructor(
         context.userPrefsDataStore.edit { it[tutorialSeenKey] = seen }
     }
 
-    suspend fun setBackupEmail(email: String) {
-        context.userPrefsDataStore.edit { prefs ->
-            val cleaned = email.trim()
-            if (cleaned.isEmpty()) {
-                prefs.remove(backupEmailKey)
-            } else {
-                prefs[backupEmailKey] = cleaned
-            }
-        }
-    }
-
     suspend fun setProfilePicturePath(path: String) {
         context.userPrefsDataStore.edit { prefs ->
             if (path.isEmpty()) {
@@ -159,7 +146,6 @@ class UserPreferences @Inject constructor(
             put("budget_widget_period", prefs[budgetWidgetPeriodKey] ?: "MONTHLY")
             put("first_run_permissions_prompted", prefs[firstRunPermissionsPromptedKey] ?: false)
             put("tutorial_seen", prefs[tutorialSeenKey] ?: false)
-            put("backup_email", prefs[backupEmailKey].orEmpty())
             put("profile_picture_path", prefs[profilePicturePathKey].orEmpty())
         }
     }
@@ -178,7 +164,6 @@ class UserPreferences @Inject constructor(
             values["budget_widget_period"]?.let { prefs[budgetWidgetPeriodKey] = it as String }
             values["first_run_permissions_prompted"]?.let { prefs[firstRunPermissionsPromptedKey] = it as Boolean }
             values["tutorial_seen"]?.let { prefs[tutorialSeenKey] = it as Boolean }
-            values["backup_email"]?.let { prefs[backupEmailKey] = it as String }
             values["profile_picture_path"]?.let { prefs[profilePicturePathKey] = it as String }
         }
     }
