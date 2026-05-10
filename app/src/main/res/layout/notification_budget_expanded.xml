@@ -29,7 +29,7 @@
             android:textColor="@color/notif_text_primary"
             android:textSize="13sp" />
 
-        <Space
+        <FrameLayout
             android:layout_width="0dp"
             android:layout_height="1dp"
             android:layout_weight="1" />
@@ -104,52 +104,55 @@
             android:layout_weight="1"
             android:background="@drawable/bg_notification_cta_primary"
             android:drawableStart="@drawable/ic_notif_add"
-            android:drawablePadding="6dp"
+            android:drawablePadding="3dp"
             android:drawableTint="@color/notif_text_primary"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
+            android:includeFontPadding="false"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
             android:singleLine="true"
             android:text="Add"
             android:textColor="@color/notif_text_primary"
-            android:textSize="12sp" />
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/notif_cta_budget"
             android:layout_width="0dp"
             android:layout_height="42dp"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="6dp"
             android:layout_weight="1"
             android:background="@drawable/bg_notification_cta"
             android:drawableStart="@drawable/ic_notif_wallet"
-            android:drawablePadding="6dp"
+            android:drawablePadding="3dp"
             android:drawableTint="@color/budget_notification_accent"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
+            android:includeFontPadding="false"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
             android:singleLine="true"
             android:text="Budget"
             android:textColor="@color/notif_text_primary"
-            android:textSize="12sp" />
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/notif_cta_cycle"
             android:layout_width="0dp"
             android:layout_height="42dp"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="6dp"
             android:layout_weight="1"
             android:background="@drawable/bg_notification_cta"
             android:drawableStart="@drawable/ic_notif_refresh"
-            android:drawablePadding="6dp"
+            android:drawablePadding="3dp"
             android:drawableTint="@color/budget_notification_accent"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
+            android:includeFontPadding="false"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
             android:singleLine="true"
             android:textColor="@color/notif_text_primary"
-            android:textSize="12sp" />
+            android:textSize="11sp" />
     </LinearLayout>
 </LinearLayout>
