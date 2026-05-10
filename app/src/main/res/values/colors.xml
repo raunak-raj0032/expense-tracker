@@ -7,7 +7,6 @@
     <color name="budget_notif_status_high">#FB923C</color>
     <color name="budget_notif_status_over">#EF4444</color>
     <color name="budget_notif_muted">#94A3B8</color>
-    <color name="notif_surface">#101A18</color>
     <color name="notif_chip_surface">#1B2C28</color>
     <color name="notif_progress_track">#263633</color>
     <color name="notif_text_primary">#F8FAFC</color>

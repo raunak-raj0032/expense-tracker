@@ -51,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -77,7 +78,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 
 private enum class CalendarViewMode {
     MONTH,
@@ -612,6 +612,7 @@ private fun CalendarGrid(
     selectedDate: LocalDate,
     onDateClick: (LocalDate) -> Unit
 ) {
+    val locale = LocalLocale.current.platformLocale
     val daysOfWeek = listOf(
         DayOfWeek.SUNDAY,
         DayOfWeek.MONDAY,
@@ -629,7 +630,7 @@ private fun CalendarGrid(
         Row(modifier = Modifier.fillMaxWidth()) {
             daysOfWeek.forEach { day ->
                 Text(
-                    text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                    text = day.getDisplayName(TextStyle.SHORT, locale),
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.labelLarge,

@@ -130,19 +130,11 @@ class BudgetNotificationService : Service() {
             Intent(ACTION_CYCLE_PERIOD).setPackage(packageName),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        val restartPi = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            PendingIntent.getForegroundService(
-                this, 3,
-                Intent(this, BudgetNotificationService::class.java).setAction(ACTION_REPOST_NOTIFICATION),
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
-        } else {
-            PendingIntent.getService(
-                this, 3,
-                Intent(this, BudgetNotificationService::class.java).setAction(ACTION_REPOST_NOTIFICATION),
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
-        }
+        val restartPi = PendingIntent.getForegroundService(
+            this, 3,
+            Intent(this, BudgetNotificationService::class.java).setAction(ACTION_REPOST_NOTIFICATION),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
 
         val titleHtml: String
         val compactHtml: String
