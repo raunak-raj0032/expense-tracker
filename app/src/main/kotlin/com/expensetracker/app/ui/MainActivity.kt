@@ -12,14 +12,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.expensetracker.app.core.notif.LastActiveTracker
 import com.expensetracker.app.diagnostics.AppDiagnostics
 import com.expensetracker.app.auth.BiometricGate
 import com.expensetracker.app.ui.navigation.MainNavigation
 import com.expensetracker.app.ui.theme.ExpenseTrackerTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
+
+    @Inject
+    lateinit var lastActiveTracker: LastActiveTracker
+
     private var captureInboxRequest by mutableStateOf(0)
     private var notificationRouteRequest by mutableStateOf(0)
     private var notificationRoute by mutableStateOf<String?>(null)
@@ -48,6 +54,11 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        lastActiveTracker.updateLastAppOpen()
     }
 
     override fun onNewIntent(intent: Intent) {

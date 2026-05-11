@@ -78,6 +78,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -99,6 +100,7 @@ import androidx.compose.material3.FilterChipDefaults
 import com.expensetracker.app.capture.requestCaptureNotificationRebind
 import com.expensetracker.app.core.money.CurrencyConverter
 import com.expensetracker.app.diagnostics.AppDiagnostics
+import com.expensetracker.app.work.WorkerScheduler
 import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.MainTopBar
 import com.expensetracker.app.ui.theme.NeonPill
@@ -425,6 +427,13 @@ fun SettingsScreen(
                     accent = MaterialTheme.colorScheme.tertiary,
                     onClick = { shareDiagnosticLog(context) }
                 )
+            }
+
+            // Notification Debug
+            item {
+                AnimatedVisibility(visible, enter = fadeIn(tween(400, 100))) {
+                    NotificationDebugCard(context = context)
+                }
             }
 
             // Danger zone
@@ -1018,4 +1027,118 @@ private fun hasAccessibilityAccess(context: Context): Boolean {
     ).orEmpty()
     val expected = "${context.packageName}/com.expensetracker.app.capture.UpiAccessibilityService"
     return enabled.split(':').any { it.equals(expected, ignoreCase = true) }
+}
+
+@Composable
+private fun NotificationDebugCard(context: Context) {
+    var expanded by remember { mutableStateOf(false) }
+    val appContext = context.applicationContext
+
+    GlassPanel(
+        modifier = Modifier.fillMaxWidth(),
+        accent = MaterialTheme.colorScheme.tertiary
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Notifications,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Notification Debug",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Test scheduled notifications",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    if (expanded) Icons.Default.ChevronRight else Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier
+                        .size(18.dp)
+                        .graphicsLayer { rotationZ = if (expanded) 90f else 0f }
+                )
+            }
+
+            AnimatedVisibility(visible = expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { WorkerScheduler.sendInactivityReminderNow(appContext) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Reminder", style = MaterialTheme.typography.labelSmall)
+                        }
+                        OutlinedButton(
+                            onClick = { WorkerScheduler.sendQuoteNow(appContext) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Quote", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { WorkerScheduler.sendDailyBudgetAlertNow(appContext) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Daily", style = MaterialTheme.typography.labelSmall)
+                        }
+                        OutlinedButton(
+                            onClick = { WorkerScheduler.sendWeeklyBudgetAlertNow(appContext) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Weekly", style = MaterialTheme.typography.labelSmall)
+                        }
+                        OutlinedButton(
+                            onClick = { WorkerScheduler.sendMonthlyBudgetAlertNow(appContext) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Monthly", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    if (expanded) "Tap to collapse" else "Tap to expand test buttons",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
 }

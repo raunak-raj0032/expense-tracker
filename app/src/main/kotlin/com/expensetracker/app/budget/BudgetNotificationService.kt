@@ -235,7 +235,7 @@ class BudgetNotificationService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_budget_notif)
+            .setSmallIcon(R.drawable.ic_notification_pig)
             .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.ic_notification_pig))
             .setContentTitle(titleText)
             .setContentText(compactText)

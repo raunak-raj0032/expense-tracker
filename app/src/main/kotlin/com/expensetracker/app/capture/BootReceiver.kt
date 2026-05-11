@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.expensetracker.app.budget.BudgetNotificationService
 import com.expensetracker.app.core.prefs.UserPreferences
+import com.expensetracker.app.work.WorkerScheduler
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -24,6 +25,7 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         if (context != null && intent?.action == Intent.ACTION_BOOT_COMPLETED) {
             requestCaptureNotificationRebind(context)
+            WorkerScheduler.scheduleAll(context)
             val pending = goAsync()
             val prefs = EntryPointAccessors.fromApplication(
                 context.applicationContext,

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -475,38 +476,86 @@ fun TagSelector(
     onCreateTag: (String) -> Unit
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
+    var tagSearch by remember { mutableStateOf("") }
     var newTagName by remember { mutableStateOf("") }
+    val filteredTags = remember(tags, tagSearch) {
+        if (tagSearch.isBlank()) tags
+        else tags.filter { it.name.contains(tagSearch.trim(), ignoreCase = true) }
+    }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        LazyRow(
-            modifier = Modifier.weight(1f),
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            items(tags) { tag ->
-                FilterChip(
-                    selected = selectedTags.contains(tag.id),
-                    onClick = { onTagToggle(tag.id) },
-                    label = { Text(tag.name, style = MaterialTheme.typography.labelSmall) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(
-                            android.graphics.Color.parseColor(tag.colorHex)
-                        ).copy(alpha = 0.3f)
+            LazyRow(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(filteredTags) { tag ->
+                    FilterChip(
+                        selected = selectedTags.contains(tag.id),
+                        onClick = { onTagToggle(tag.id) },
+                        label = { Text(tag.name, style = MaterialTheme.typography.labelSmall) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(
+                                android.graphics.Color.parseColor(tag.colorHex)
+                            ).copy(alpha = 0.3f)
+                        )
                     )
+                }
+            }
+            IconButton(
+                onClick = { showSearch = !showSearch },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Search tags",
+                    modifier = Modifier.size(16.dp),
+                    tint = if (showSearch) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            IconButton(
+                onClick = {
+                    newTagName = ""
+                    showCreateDialog = true
+                },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "New tag", modifier = Modifier.size(16.dp))
+            }
         }
-        IconButton(
-            onClick = {
-                newTagName = ""
-                showCreateDialog = true
-            },
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "New tag", modifier = Modifier.size(16.dp))
+
+        if (showSearch) {
+            OutlinedTextField(
+                value = tagSearch,
+                onValueChange = { tagSearch = it },
+                label = { Text("Search tags") },
+                placeholder = { Text("Food, travel, bills...") },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                },
+                trailingIcon = {
+                    if (tagSearch.isNotEmpty()) {
+                        IconButton(onClick = { tagSearch = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear tag search")
+                        }
+                    }
+                },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                colors = fieldColors()
+            )
+            if (filteredTags.isEmpty()) {
+                Text(
+                    text = "No tags match \"$tagSearch\"",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 
