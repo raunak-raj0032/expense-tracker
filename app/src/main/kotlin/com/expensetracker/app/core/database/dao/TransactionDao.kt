@@ -102,6 +102,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE fingerprintHash = :hash AND deletedAt IS NULL LIMIT 1")
     suspend fun findByFingerprint(hash: String): TransactionEntity?
 
+    @Query("SELECT * FROM transactions WHERE fingerprintHash = :hash AND deletedAt IS NULL AND transactionTime >= :sinceMillis LIMIT 1")
+    suspend fun findByFingerprintSince(hash: String, sinceMillis: Long): TransactionEntity?
+
     @Query("SELECT * FROM transactions WHERE status = 'SUGGESTED' AND deletedAt IS NULL ORDER BY transactionTime DESC")
     fun observeSuggested(): Flow<List<TransactionEntity>>
 

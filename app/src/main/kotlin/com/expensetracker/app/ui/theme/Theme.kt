@@ -59,9 +59,9 @@ object AppColors {
     val Ink700  = Color(0xFF1C2E27)        // surface variant
     val Ink600  = Color(0xFF263D34)        // outline variant
 
-    // Light mode (clean off-white)
-    val Cream50  = Color(0xFFF5FDF9)
-    val Cream100 = Color(0xFFE8F8F1)
+    // Light mode (warm sage — easy on eyes, not stark white)
+    val Cream50  = Color(0xFFE8F0EB)
+    val Cream100 = Color(0xFFDBE6DF)
     val Ink100   = Color(0xFF1A3028)       // on-background light
     val Ink200   = Color(0xFF2D4A3D)
     val Ink300   = Color(0xFF406356)
@@ -121,7 +121,7 @@ private val LightColorScheme = lightColorScheme(
 
     background          = AppColors.Cream50,
     onBackground        = AppColors.Ink100,
-    surface             = Color.White,
+    surface             = Color(0xFFF0F6F2),
     onSurface           = AppColors.Ink100,
     surfaceVariant      = AppColors.Cream100,
     onSurfaceVariant    = AppColors.Ink300,

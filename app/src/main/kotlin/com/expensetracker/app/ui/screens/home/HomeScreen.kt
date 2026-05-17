@@ -4,12 +4,20 @@ package com.expensetracker.app.ui.screens.home
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -21,6 +29,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -39,7 +48,9 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Speed
@@ -49,6 +60,8 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -66,6 +79,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
@@ -103,7 +117,6 @@ import kotlinx.coroutines.delay
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -125,6 +138,7 @@ fun HomeScreen(
     val profilePicturePath = uiState.profilePicturePath
     var visible by remember { mutableStateOf(false) }
     var showBulkDeleteDialog by remember { mutableStateOf(false) }
+    var fabExpanded by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { delay(80); visible = true }
 
     Scaffold(
@@ -181,18 +195,18 @@ fun HomeScreen(
             }
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick          = onAddTransaction,
-                modifier = Modifier.onGloballyPositioned {
+            ExpandableFab(
+                expanded            = fabExpanded,
+                onToggle            = { fabExpanded = !fabExpanded },
+                onAddTransaction    = { fabExpanded = false; onAddTransaction() },
+                onOpenBudget        = { fabExpanded = false; onOpenBudget() },
+                onOpenCaptureInbox  = { fabExpanded = false; onOpenCaptureInbox() },
+                onOpenStatementImport = { fabExpanded = false; onOpenStatementImport() },
+                openCaptureCount    = uiState.openCaptureCount,
+                modifier            = Modifier.onGloballyPositioned {
                     onTutorialTargetPositioned(TutorialTarget.AddButton, it.boundsInRoot())
-                },
-                containerColor   = MaterialTheme.colorScheme.primary,
-                contentColor     = MaterialTheme.colorScheme.onPrimary,
-                elevation        = FloatingActionButtonDefaults.elevation(8.dp, 12.dp),
-                shape            = RoundedCornerShape(18.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Transaction", modifier = Modifier.size(26.dp))
-            }
+                }
+            )
         }
     ) { padding ->
         LazyColumn(
@@ -219,42 +233,23 @@ fun HomeScreen(
                         modifier = Modifier.onGloballyPositioned {
                             onTutorialTargetPositioned(TutorialTarget.MonthlySummary, it.boundsInRoot())
                         },
-                        monthName            = uiState.monthName,
-                        totalExpense         = uiState.totalExpense,
-                        totalIncome          = uiState.totalIncome,
-                        budgetRemaining      = uiState.budgetRemaining,
-                        budgetTotal          = uiState.budgetTotal,
-                        budgetName           = uiState.budgetName,
-                        todayExpense         = uiState.todayExpense,
-                        todayBudgetAllowance = uiState.todayBudgetAllowance,
-                        transactionsThisMonth= uiState.transactionsThisMonth,
-                        activeDays           = uiState.activeDays,
-                        streakDays           = uiState.streakDays,
-                        dayOfMonth           = uiState.dayOfMonth,
-                        daysInMonth          = uiState.daysInMonth,
-                        netFlow              = uiState.netFlow
-                    )
-                }
-            }
-
-            item {
-                AnimatedVisibility(
-                    visible = visible,
-                    enter   = fadeIn(tween(500, delayMillis = 80)) + slideInVertically(
-                        initialOffsetY = { 24 },
-                        animationSpec  = tween(500, delayMillis = 80, easing = FastOutSlowInEasing)
-                    )
-                ) {
-                    QuickActionGrid(
-                        budgetName          = uiState.budgetName,
-                        openCaptureCount    = uiState.openCaptureCount,
-                        onAddTransaction    = onAddTransaction,
-                        onOpenBudget        = onOpenBudget,
-                        onOpenCaptureInbox  = onOpenCaptureInbox,
-                        onOpenStatementImport = onOpenStatementImport,
-                        modifier = Modifier.onGloballyPositioned {
-                            onTutorialTargetPositioned(TutorialTarget.QuickActions, it.boundsInRoot())
-                        }
+                        monthName             = uiState.monthName,
+                        totalExpense          = uiState.totalExpense,
+                        totalIncome           = uiState.totalIncome,
+                        budgetRemaining       = uiState.budgetRemaining,
+                        budgetTotal           = uiState.budgetTotal,
+                        budgetName            = uiState.budgetName,
+                        todayExpense          = uiState.todayExpense,
+                        todayBudgetAllowance  = uiState.todayBudgetAllowance,
+                        transactionsThisMonth = uiState.transactionsThisMonth,
+                        activeDays            = uiState.activeDays,
+                        streakDays            = uiState.streakDays,
+                        dayOfMonth            = uiState.dayOfMonth,
+                        daysInMonth           = uiState.daysInMonth,
+                        netFlow               = uiState.netFlow,
+                        openCaptureCount      = uiState.openCaptureCount,
+                        onOpenCaptureInbox    = onOpenCaptureInbox,
+                        onOpenStatementImport = onOpenStatementImport
                     )
                 }
             }
@@ -329,6 +324,7 @@ fun HomeScreen(
                     }
                 }
             }
+
         }
     }
 
@@ -371,10 +367,12 @@ fun MonthlySummaryCard(
     dayOfMonth: Int,
     daysInMonth: Int,
     netFlow: Long,
+    openCaptureCount: Int = 0,
+    onOpenCaptureInbox: () -> Unit = {},
+    onOpenStatementImport: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val coveragePercent = if (dayOfMonth > 0)
-        ((activeDays.toFloat() / dayOfMonth.toFloat()) * 100f).roundToInt() else 0
+    val avgPerDay = if (dayOfMonth > 0) totalExpense / dayOfMonth else 0L
 
     val paceAccent = when {
         todayBudgetAllowance == null || budgetTotal == null -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -392,17 +390,16 @@ fun MonthlySummaryCard(
         modifier = modifier.fillMaxWidth(),
         accent   = MaterialTheme.colorScheme.primary
     ) {
-        
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment     = Alignment.CenterVertically
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text  = "$monthName · Day $dayOfMonth".uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    text          = "$monthName · Day $dayOfMonth".uppercase(),
+                    style         = MaterialTheme.typography.labelSmall,
+                    color         = MaterialTheme.colorScheme.primary,
                     letterSpacing = 1.2.sp
                 )
             }
@@ -411,12 +408,11 @@ fun MonthlySummaryCard(
 
         AccentDivider(accent = MaterialTheme.colorScheme.primary)
 
-        
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                text  = "NET FLOW",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text          = "NET FLOW",
+                style         = MaterialTheme.typography.labelSmall,
+                color         = MaterialTheme.colorScheme.onSurfaceVariant,
                 letterSpacing = 1.0.sp
             )
             Text(
@@ -432,58 +428,70 @@ fun MonthlySummaryCard(
             )
         }
 
-        
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             BalanceChip(
-                label  = "Spent",
-                amount = formatAmount(totalExpense),
-                tint   = MaterialTheme.colorScheme.error,
-                icon   = Icons.Default.ArrowDownward,
+                label    = "Spent",
+                amount   = formatAmount(totalExpense),
+                tint     = MaterialTheme.colorScheme.error,
+                icon     = Icons.Default.ArrowDownward,
                 modifier = Modifier.weight(1f)
             )
             BalanceChip(
-                label  = "Received",
-                amount = formatAmount(totalIncome),
-                tint   = MaterialTheme.colorScheme.secondary,
-                icon   = Icons.Default.ArrowUpward,
+                label    = "Received",
+                amount   = formatAmount(totalIncome),
+                tint     = MaterialTheme.colorScheme.secondary,
+                icon     = Icons.Default.ArrowUpward,
                 modifier = Modifier.weight(1f)
             )
             BalanceChip(
-                label  = "Pace",
-                amount = paceValue,
-                tint   = paceAccent,
-                icon   = Icons.Default.Speed,
+                label    = "Pace",
+                amount   = paceValue,
+                tint     = paceAccent,
+                icon     = Icons.Default.Speed,
                 modifier = Modifier.weight(1f)
             )
         }
 
-        
+        val daysLeft      = daysInMonth - dayOfMonth
+        val daysLeftAccent = when {
+            daysLeft <= 5  -> MaterialTheme.colorScheme.error
+            daysLeft <= 10 -> MaterialTheme.colorScheme.tertiary
+            else           -> MaterialTheme.colorScheme.secondary
+        }
+
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             InsightStatCard(
                 label     = "Streak",
                 value     = "${streakDays}d",
-                supporting= if (streakDays > 0) "Keep it going" else "Start tracking",
+                supporting= if (streakDays > 0) "Keep going" else "Start now",
                 icon      = Icons.Default.LocalFireDepartment,
                 accent    = MaterialTheme.colorScheme.tertiary,
-                modifier  = Modifier.weight(1f).heightIn(min = 110.dp)
+                modifier  = Modifier.weight(1f)
             )
             InsightStatCard(
-                label     = "Coverage",
-                value     = "$coveragePercent%",
-                supporting= "$activeDays of $dayOfMonth days",
+                label     = "Avg / Day",
+                value     = formatAmount(avgPerDay),
+                supporting= "this month",
                 icon      = Icons.Default.CalendarToday,
                 accent    = MaterialTheme.colorScheme.secondary,
-                modifier  = Modifier.weight(1f).heightIn(min = 110.dp)
+                modifier  = Modifier.weight(1f)
+            )
+            InsightStatCard(
+                label     = "Days Left",
+                value     = "$daysLeft",
+                supporting= "until end",
+                icon      = Icons.Default.DateRange,
+                accent    = daysLeftAccent,
+                modifier  = Modifier.weight(1f)
             )
         }
 
-        
         if (budgetRemaining != null && budgetTotal != null && budgetTotal > 0 && todayBudgetAllowance != null) {
             BudgetProgressSection(
                 totalExpense         = totalExpense,
@@ -505,12 +513,12 @@ fun MonthlySummaryCard(
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment     = Alignment.CenterVertically
                 ) {
                     Icon(
                         Icons.Default.Savings,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.tertiary,
+                        tint     = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
@@ -521,6 +529,17 @@ fun MonthlySummaryCard(
                 }
             }
         }
+
+        // ── Capture pending (conditional) ──────────────────────────────
+        if (openCaptureCount > 0) {
+            CapturePendingBanner(
+                count   = openCaptureCount,
+                onClick = onOpenCaptureInbox
+            )
+        }
+
+        // ── Statement import nudge ─────────────────────────────────────
+        StatementNudgeRow(onClick = onOpenStatementImport)
     }
 }
 
@@ -572,30 +591,55 @@ private fun InsightStatCard(
 ) {
     Box(
         modifier = modifier
-            .clip(MaterialTheme.shapes.medium)
+            .aspectRatio(1f)
+            .clip(MaterialTheme.shapes.large)
             .background(
                 Brush.linearGradient(
                     colors = listOf(
-                        accent.copy(alpha = 0.12f),
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        accent.copy(alpha = 0.13f),
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
                     )
                 )
             )
-            .padding(12.dp)
+            .padding(11.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(accent.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center
+        Column(
+            modifier            = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.Top
             ) {
-                Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(16.dp))
+                Text(
+                    text  = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint     = accent,
+                    modifier = Modifier.size(14.dp)
+                )
             }
-            Text(text = label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(text = value, style = MaterialTheme.typography.titleLarge.financialFigures(FontWeight.ExtraBold), maxLines = 1)
-            Text(text = supporting, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text     = value,
+                    style    = MaterialTheme.typography.titleSmall.financialFigures(FontWeight.ExtraBold),
+                    color    = accent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text     = supporting,
+                    style    = MaterialTheme.typography.labelSmall,
+                    color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
@@ -753,75 +797,105 @@ private fun BudgetPaceCard(
 }
 
 @Composable
-private fun QuickActionGrid(
-    budgetName: String?,
-    openCaptureCount: Int,
+private fun ExpandableFab(
+    expanded: Boolean,
+    onToggle: () -> Unit,
     onAddTransaction: () -> Unit,
     onOpenBudget: () -> Unit,
     onOpenCaptureInbox: () -> Unit,
     onOpenStatementImport: () -> Unit,
+    openCaptureCount: Int,
     modifier: Modifier = Modifier
 ) {
-    GlassPanel(
-        modifier = modifier.fillMaxWidth(),
-        accent   = MaterialTheme.colorScheme.secondary
+    Column(
+        modifier            = modifier,
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        SectionHeader(
-            eyebrow  = "Shortcuts",
-            title    = "Fast Lane",
-            subtitle = "Actions you need every day"
-        )
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        AnimatedVisibility(
+            visible = expanded,
+            enter   = fadeIn(tween(180)) + slideInVertically(tween(200)) { it / 3 },
+            exit    = fadeOut(tween(140)) + slideOutVertically(tween(160)) { it / 3 }
         ) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HomeActionCard(
-                    title    = "Add transaction",
-                    subtitle = "Log cash, card, UPI",
-                    icon     = Icons.Default.Add,
-                    accent   = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f),
-                    testTag  = "home_action_add",
-                    onClick  = onAddTransaction
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                SpeedDialItem(
+                    label   = "Import PDF",
+                    icon    = Icons.Default.Receipt,
+                    accent  = MaterialTheme.colorScheme.primary,
+                    onClick = onOpenStatementImport
                 )
-                HomeActionCard(
-                    title    = budgetName ?: "Set Budget",
-                    subtitle = if (budgetName == null) "Create monthly limit" else "Adjust target",
-                    icon     = Icons.Default.Savings,
-                    accent   = MaterialTheme.colorScheme.secondary,
-                    badge    = if (budgetName == null) "Plan" else "Active",
-                    modifier = Modifier.weight(1f),
-                    testTag  = "home_action_budget",
-                    onClick  = onOpenBudget
+                SpeedDialItem(
+                    label   = if (openCaptureCount > 0) "Inbox · $openCaptureCount" else "Capture",
+                    icon    = Icons.Default.AutoAwesome,
+                    accent  = MaterialTheme.colorScheme.tertiary,
+                    onClick = onOpenCaptureInbox
                 )
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HomeActionCard(
-                    title    = if (openCaptureCount > 0) "Capture Inbox" else "Smart Capture",
-                    subtitle = if (openCaptureCount > 0) "$openCaptureCount waiting" else "SMS & notifications",
-                    icon     = Icons.Default.AutoAwesome,
-                    accent   = MaterialTheme.colorScheme.tertiary,
-                    badge    = if (openCaptureCount > 0) "$openCaptureCount" else "Live",
-                    modifier = Modifier.weight(1f),
-                    testTag  = "home_action_capture",
-                    onClick  = onOpenCaptureInbox
+                SpeedDialItem(
+                    label   = "Budget",
+                    icon    = Icons.Default.Savings,
+                    accent  = MaterialTheme.colorScheme.secondary,
+                    onClick = onOpenBudget
                 )
-                HomeActionCard(
-                    title    = "Statements",
-                    subtitle = "Import bank/card PDFs",
-                    icon     = Icons.Default.Receipt,
-                    accent   = MaterialTheme.colorScheme.primary,
-                    badge    = "PDF",
-                    modifier = Modifier.weight(1f),
-                    testTag  = "home_action_statement",
-                    onClick  = onOpenStatementImport
+                SpeedDialItem(
+                    label   = "Add Transaction",
+                    icon    = Icons.Default.Add,
+                    accent  = MaterialTheme.colorScheme.primary,
+                    onClick = onAddTransaction
                 )
             }
+        }
+
+        FloatingActionButton(
+            onClick        = onToggle,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor   = MaterialTheme.colorScheme.onPrimary,
+            elevation      = FloatingActionButtonDefaults.elevation(8.dp, 12.dp),
+            shape          = RoundedCornerShape(18.dp)
+        ) {
+            Icon(
+                imageVector        = if (expanded) Icons.Default.Close else Icons.Default.Menu,
+                contentDescription = if (expanded) "Close menu" else "Open menu",
+                modifier           = Modifier.size(24.dp)
+            )
         }
     }
 }
 
+@Composable
+private fun SpeedDialItem(label: String, icon: ImageVector, accent: Color, onClick: () -> Unit) {
+    Row(
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Surface(
+            shape         = RoundedCornerShape(10.dp),
+            color         = MaterialTheme.colorScheme.surface,
+            shadowElevation = 3.dp
+        ) {
+            Text(
+                text       = label,
+                style      = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier   = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+            )
+        }
+        SmallFloatingActionButton(
+            onClick        = onClick,
+            containerColor = accent,
+            contentColor   = MaterialTheme.colorScheme.surface,
+            shape          = RoundedCornerShape(14.dp),
+            elevation      = FloatingActionButtonDefaults.elevation(4.dp, 6.dp)
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+// Kept for potential reuse — no longer rendered in MonthlySummaryCard but used nowhere else currently
+@Suppress("unused")
 @Composable
 private fun HomeActionCard(
     title: String,
@@ -874,6 +948,147 @@ private fun HomeActionCard(
                 Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
+    }
+}
+
+@Composable
+private fun CapturePendingBanner(count: Int, onClick: () -> Unit) {
+    val tertiary  = MaterialTheme.colorScheme.tertiary
+    val secondary = MaterialTheme.colorScheme.secondary
+
+    val pulse = rememberInfiniteTransition(label = "capture_pulse")
+    val glowAlpha by pulse.animateFloat(
+        initialValue  = 0.55f,
+        targetValue   = 0.90f,
+        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse),
+        label         = "glow"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.extraLarge)
+            .background(
+                Brush.linearGradient(
+                    listOf(tertiary.copy(alpha = 0.88f), secondary.copy(alpha = 0.70f))
+                )
+            )
+            .clickable(onClick = onClick)
+            .padding(20.dp)
+    ) {
+        // Corner glow blob
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(110.dp)
+                .background(
+                    Brush.radialGradient(
+                        listOf(Color.White.copy(alpha = 0.12f), Color.Transparent)
+                    )
+                )
+        )
+        // Pulsing ring indicator in top-right
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = glowAlpha))
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            NeonPill(text = "Auto-detected", accent = Color.White.copy(alpha = 0.88f))
+
+            Text(
+                text       = "$count payment${if (count > 1) "s" else ""}",
+                style      = MaterialTheme.typography.displaySmall.financialFigures(FontWeight.Black),
+                color      = Color.White
+            )
+            Text(
+                text  = "captured and waiting for your review",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.72f)
+            )
+
+            AccentDivider(accent = Color.White.copy(alpha = 0.22f))
+
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                Text(
+                    text       = "Review & confirm",
+                    style      = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color      = Color.White
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.20f))
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint     = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun StatementNudgeRow(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment     = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.Receipt,
+                contentDescription = null,
+                tint     = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text       = "Import bank statement",
+                style      = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text  = "Upload PDF or CSV for a complete picture",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        NeonPill(text = "PDF", accent = MaterialTheme.colorScheme.secondary)
+        Icon(
+            Icons.AutoMirrored.Filled.ArrowForward,
+            contentDescription = null,
+            tint     = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(14.dp)
+        )
     }
 }
 

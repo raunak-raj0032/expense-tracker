@@ -18,6 +18,8 @@ import com.expensetracker.app.ui.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 import javax.inject.Inject
@@ -30,35 +32,45 @@ class UpiAccessibilityService : AccessibilityService() {
 
     private val serviceScope = CoroutineScope(Dispatchers.IO)
 
-    // In-memory dedupe so we don't reprocess every content-change tick on the
-    // same success screen. Keyed by a lightweight hash of the payload text.
+    // Dedupe: keyed by fingerprint of payload text.
     private var lastFingerprint: String? = null
     private var lastFingerprintAt: Long = 0L
 
+    // Rate-limit CONTENT_CHANGED events per package (package → last-read timestamp).
+    private val lastContentReadAt = mutableMapOf<String, Long>()
+
+    // Pending delayed reads per package so we cancel/replace on rapid events.
+    private val pendingReads = mutableMapOf<String, Job>()
+
     companion object {
+        private const val TAG = "UpiCapture"
         private const val CHANNEL_ID = "upi_capture_confirm"
         private const val KEEPALIVE_CHANNEL_ID = "upi_capture_keepalive"
         private const val KEEPALIVE_NOTIFICATION_ID = 4242
         private const val DEDUPE_WINDOW_MS = 60_000L
-        private const val MAX_TRAVERSAL_NODES = 700
+        private const val MAX_TRAVERSAL_NODES = 800
+        // Delay after window-state-changed so animations finish before we read the tree.
+        private const val WINDOW_SETTLE_MS = 500L
+        // Minimum gap between content-changed reads for the same package.
+        private const val CONTENT_CHANGE_THROTTLE_MS = 2_000L
 
         private val SUPPORTED_PACKAGES = setOf(
-            "com.google.android.apps.nbu.paisa.user",     // Google Pay (current)
-            "com.google.android.apps.nbu.paisa.provider", // Google Pay (legacy)
-            "com.phonepe.app",                            // PhonePe
+            "com.google.android.apps.nbu.paisa.user",
+            "com.google.android.apps.nbu.paisa.provider",
+            "com.phonepe.app",
             "com.phonepe.app.preprod",
-            "net.one97.paytm",                            // Paytm
+            "net.one97.paytm",
             "com.paytm.app",
-            "in.org.npci.bhimapp",                        // BHIM
-            "in.amazon.mShop.android.shopping",           // Amazon Pay
-            "com.dreamplug.androidapp",                   // CRED
-            "com.mobikwik_new",                           // MobiKwik
-            "com.freecharge.android",                     // Freecharge
-            "com.whatsapp",                               // WhatsApp Pay
+            "in.org.npci.bhimapp",
+            "in.amazon.mShop.android.shopping",
+            "com.dreamplug.androidapp",
+            "com.mobikwik_new",
+            "com.freecharge.android",
+            "com.whatsapp",
             "com.whatsapp.w4b",
-            "com.upi.axispay",                            // Axis Pay
-            "com.sbi.upi",                                // BHIM SBI Pay
-            "com.fss.unbipsp",                            // BHIM BOI UPI
+            "com.upi.axispay",
+            "com.sbi.upi",
+            "com.fss.unbipsp",
             "com.csam.icici.bank.imobile",
             "com.axisbank.digibank",
             "com.icici.bank.imobile"
@@ -80,12 +92,16 @@ class UpiAccessibilityService : AccessibilityService() {
             "money received",
             "amount debited",
             "amount credited",
-            "paid •",   // GPay post-payment "Paid • HH:MM" badge
-            "paid ·",   // middle-dot variant
+            "paid •",
+            "paid ·",
             "debited from",
             "credited to",
             "utr",
-            "upi transaction id"
+            "upi transaction id",
+            "transaction id",
+            "you paid",
+            "you sent",
+            "₹"        // fallback — any screen with a rupee symbol from a UPI app
         )
     }
 
@@ -100,71 +116,156 @@ class UpiAccessibilityService : AccessibilityService() {
         val pkg = event.packageName?.toString() ?: return
         if (pkg !in SUPPORTED_PACKAGES) return
 
-        val type = event.eventType
-        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
-            type != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
-        ) return
+        when (event.eventType) {
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                // New screen opened — wait for it to finish rendering, then read.
+                scheduleDelayedRead(pkg, WINDOW_SETTLE_MS)
+            }
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
+                // Fires constantly while a screen is live. Throttle aggressively.
+                val now = System.currentTimeMillis()
+                val last = lastContentReadAt[pkg] ?: 0L
+                if (now - last >= CONTENT_CHANGE_THROTTLE_MS) {
+                    lastContentReadAt[pkg] = now
+                    scheduleDelayedRead(pkg, 0L)
+                }
+            }
+            else -> return
+        }
+    }
 
-        val root = rootInActiveWindow ?: run {
-            Log.d("UpiCapture", "no root window for $pkg")
+    private fun scheduleDelayedRead(pkg: String, delayMs: Long) {
+        // Cancel any pending read for this package — we only want the latest one.
+        pendingReads[pkg]?.cancel()
+        pendingReads[pkg] = serviceScope.launch {
+            if (delayMs > 0) delay(delayMs)
+            processPackageScreen(pkg)
+        }
+    }
+
+    private suspend fun processPackageScreen(pkg: String) {
+        val text = readTextFromAllWindows(pkg)
+        if (text.isNullOrBlank()) {
+            Log.v(TAG, "no text collected for $pkg")
             return
         }
-        val collected = collectText(root, event) ?: return
-        if (collected.isBlank()) return
 
-        val lower = collected.lowercase(Locale.ROOT)
+        val lower = text.lowercase(Locale.ROOT)
         if (SUCCESS_KEYWORDS.none(lower::contains)) {
-            Log.v("UpiCapture", "no success keyword in $pkg screen: ${collected.take(200)}")
+            Log.v(TAG, "no success keyword in $pkg (${text.take(120)})")
             return
         }
-        Log.d("UpiCapture", "match pkg=$pkg text=${collected.take(400)}")
+        Log.d(TAG, "match pkg=$pkg text=${text.take(400)}")
 
-        // Debounce repeats of the same screen text.
-        val fp = (pkg + "|" + collected.lowercase(Locale.ROOT).replace(Regex("\\d{1,2}:\\d{2}"), "")).hashCode().toString()
+        // Dedupe: fingerprint on package + normalized text (strip clock digits).
+        val fp = (pkg + "|" + lower
+            .replace(Regex("\\d{1,2}:\\d{2}(:\\d{2})?"), "")
+            .replace(Regex("\\d{10,}"), "REF"))          // strip long ref numbers that change
+            .hashCode().toString()
         val now = System.currentTimeMillis()
         if (fp == lastFingerprint && now - lastFingerprintAt < DEDUPE_WINDOW_MS) return
         lastFingerprint = fp
         lastFingerprintAt = now
 
-        serviceScope.launch {
-            runCatching {
-                val outcome = captureEventRepository.captureAccessibility(
-                    packageName = pkg,
-                    text = collected
-                )
-                if (outcome.eventId != null && !outcome.autoImported) {
-                    postConfirmNotification(outcome.eventId, pkg)
+        runCatching {
+            val outcome = captureEventRepository.captureAccessibility(
+                packageName = pkg,
+                text = text
+            )
+            if (outcome.eventId != null && !outcome.autoImported) {
+                postConfirmNotification(outcome.eventId, pkg)
+            }
+        }.onFailure { Log.e(TAG, "capture failed for $pkg", it) }
+    }
+
+    /**
+     * Reads text from every window belonging to [targetPkg].
+     *
+     * Using `windows` (the full window list) is more reliable than
+     * `rootInActiveWindow` alone because UPI apps often show their
+     * success screen in a dialog or overlay window that isn't the active root.
+     */
+    private fun readTextFromAllWindows(targetPkg: String): String? {
+        val roots = mutableListOf<AccessibilityNodeInfo>()
+
+        runCatching {
+            windows
+                ?.filter { w -> w.root?.packageName?.toString() == targetPkg }
+                ?.mapNotNull { it.root }
+                ?.let(roots::addAll)
+        }
+
+        // Fallback to rootInActiveWindow if the window list gave us nothing.
+        if (roots.isEmpty()) {
+            rootInActiveWindow
+                ?.takeIf { it.packageName?.toString() == targetPkg }
+                ?.let(roots::add)
+        }
+
+        if (roots.isEmpty()) return null
+
+        val combined = roots
+            .mapNotNull { root ->
+                try {
+                    collectText(root)
+                } finally {
+                    root.recycle()
                 }
             }
-        }
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
+            .trim()
+
+        return combined.takeIf { it.isNotBlank() }
     }
 
-    override fun onInterrupt() {
-        // No-op — nothing to cancel on screen.
-    }
-
-    private fun collectText(root: AccessibilityNodeInfo, event: AccessibilityEvent): String? {
+    /**
+     * BFS traversal of [root] collecting text + content descriptions.
+     *
+     * When a node carries both a text value and a content description that
+     * differs from the text, we emit "desc: text" — this reconstructs the
+     * label-value pairs common on UPI success screens (e.g. "Amount: ₹500").
+     *
+     * Nodes are recycled after their children are added to the queue so we
+     * don't hold stale references or leak pooled objects on API < 29.
+     */
+    private fun collectText(root: AccessibilityNodeInfo): String? {
         val pieces = mutableListOf<String>()
-        event.text
-            .mapNotNull { it?.toString()?.takeIf(String::isNotBlank) }
-            .let(pieces::addAll)
-        event.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let(pieces::add)
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.addLast(root)
         var visited = 0
 
         while (queue.isNotEmpty() && visited < MAX_TRAVERSAL_NODES) {
             val node = queue.removeFirst()
-            visited += 1
-            node.text?.toString()?.takeIf { it.isNotBlank() }?.let(pieces::add)
-            node.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let(pieces::add)
+            visited++
+
+            val text = node.text?.toString()?.trim().orEmpty()
+            val desc = node.contentDescription?.toString()?.trim().orEmpty()
+
+            val piece = when {
+                text.isNotBlank() && desc.isNotBlank() && !desc.equals(text, ignoreCase = true) ->
+                    "$desc: $text"
+                text.isNotBlank() -> text
+                desc.isNotBlank() -> desc
+                else -> null
+            }
+            piece?.let(pieces::add)
+
+            // Enqueue children first, then recycle parent (safe: getChild returns
+            // independent objects from the accessibility pool).
             for (i in 0 until node.childCount) {
                 node.getChild(i)?.let(queue::addLast)
+            }
+            if (node !== root) {
+                @Suppress("DEPRECATION")
+                node.recycle()
             }
         }
 
         return pieces.distinct().joinToString(" ").trim().takeIf { it.isNotEmpty() }
     }
+
+    override fun onInterrupt() = Unit
 
     private fun postConfirmNotification(eventId: Long, packageName: String) {
         val nm = getSystemService(NOTIFICATION_SERVICE) as? NotificationManager ?: return
@@ -184,7 +285,7 @@ class UpiAccessibilityService : AccessibilityService() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Payment ready to review")
             .setContentText("$appLabel capture is waiting in Pocket Pulse")
-            .setSmallIcon(R.drawable.ic_budget_notif)
+            .setSmallIcon(R.drawable.ic_notification_pig)
             .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.ic_notification_pig))
             .setSubText("Pocket Pulse")
             .setColor(accent)
@@ -206,25 +307,23 @@ class UpiAccessibilityService : AccessibilityService() {
     private fun ensureChannel() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as? NotificationManager ?: return
         if (nm.getNotificationChannel(CHANNEL_ID) == null) {
-            val channel = NotificationChannel(
+            NotificationChannel(
                 CHANNEL_ID,
                 "UPI confirmation prompts",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Prompts you to confirm UPI payments detected from your UPI apps"
-            }
-            nm.createNotificationChannel(channel)
+            }.also(nm::createNotificationChannel)
         }
         if (nm.getNotificationChannel(KEEPALIVE_CHANNEL_ID) == null) {
-            val channel = NotificationChannel(
+            NotificationChannel(
                 KEEPALIVE_CHANNEL_ID,
                 "UPI capture running",
                 NotificationManager.IMPORTANCE_MIN
             ).apply {
                 description = "Keeps UPI app capture running in the background"
                 setShowBadge(false)
-            }
-            nm.createNotificationChannel(channel)
+            }.also(nm::createNotificationChannel)
         }
     }
 
@@ -233,15 +332,13 @@ class UpiAccessibilityService : AccessibilityService() {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pi = PendingIntent.getActivity(
-            this,
-            0,
-            intent,
+            this, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notification = NotificationCompat.Builder(this, KEEPALIVE_CHANNEL_ID)
             .setContentTitle("UPI capture is on")
             .setContentText("Watching payment screens quietly in the background")
-            .setSmallIcon(R.drawable.ic_budget_notif)
+            .setSmallIcon(R.drawable.ic_notification_pig)
             .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.ic_notification_pig))
             .setSubText("Pocket Pulse")
             .setColor(ContextCompat.getColor(this, R.color.budget_notification_accent))
@@ -263,7 +360,7 @@ class UpiAccessibilityService : AccessibilityService() {
             } else {
                 startForeground(KEEPALIVE_NOTIFICATION_ID, notification)
             }
-        }.onFailure { Log.w("UpiCapture", "startForeground failed", it) }
+        }.onFailure { Log.w(TAG, "startForeground failed", it) }
     }
 
     private fun sourceAppName(pkg: String): String = when (pkg) {
@@ -276,7 +373,7 @@ class UpiAccessibilityService : AccessibilityService() {
         "com.dreamplug.androidapp" -> "CRED"
         "com.mobikwik_new" -> "MobiKwik"
         "com.freecharge.android" -> "Freecharge"
-        "com.whatsapp" -> "WhatsApp"
+        "com.whatsapp", "com.whatsapp.w4b" -> "WhatsApp"
         else -> "UPI"
     }
 }

@@ -49,8 +49,8 @@ interface CaptureEventDao {
     @Query("SELECT * FROM capture_events ORDER BY id ASC")
     suspend fun getAllForBackup(): List<CaptureEventEntity>
 
-    @Query("SELECT * FROM capture_events WHERE fingerprintHash = :hash LIMIT 1")
-    suspend fun findDuplicate(hash: String): CaptureEventEntity?
+    @Query("SELECT * FROM capture_events WHERE fingerprintHash = :hash AND receivedAt >= :sinceMillis LIMIT 1")
+    suspend fun findDuplicate(hash: String, sinceMillis: Long): CaptureEventEntity?
 
     @Query("""
         SELECT * FROM capture_events

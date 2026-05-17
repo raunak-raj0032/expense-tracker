@@ -167,7 +167,8 @@ class CaptureEventRepository @Inject constructor(
         val fingerprint = event.fingerprintHash ?: parseResult.fingerprint
 
         if (fingerprint != null) {
-            transactionRepository.findByFingerprint(fingerprint)?.let { existing ->
+            val dedupSince = event.receivedAt - FINGERPRINT_DEDUP_WINDOW_MS
+            transactionRepository.findByFingerprintSince(fingerprint, dedupSince)?.let { existing ->
                 captureEventDao.linkTransaction(eventId, existing.id)
                 return existing.id
             }
@@ -218,11 +219,12 @@ class CaptureEventRepository @Inject constructor(
             return StoreOutcome(0L, false)
         }
 
-        if (captureEventDao.findDuplicate(parseResult.fingerprint) != null) {
+        val dedupSince = receivedAt - FINGERPRINT_DEDUP_WINDOW_MS
+        if (captureEventDao.findDuplicate(parseResult.fingerprint, dedupSince) != null) {
             return StoreOutcome(0L, false)
         }
 
-        if (transactionRepository.findByFingerprint(parseResult.fingerprint) != null) {
+        if (transactionRepository.findByFingerprintSince(parseResult.fingerprint, dedupSince) != null) {
             return StoreOutcome(0L, false)
         }
 
@@ -416,6 +418,7 @@ class CaptureEventRepository @Inject constructor(
 
     private companion object {
         const val NEAR_DUPLICATE_WINDOW_MS = 5 * 60 * 1000L
+        const val FINGERPRINT_DEDUP_WINDOW_MS = 24 * 60 * 60 * 1000L
 
         val notificationSourceNames = mapOf(
             "com.google.android.apps.nbu.paisa.user" to "Google Pay",

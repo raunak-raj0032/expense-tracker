@@ -89,6 +89,9 @@ class TransactionRepository @Inject constructor(
     suspend fun findByFingerprint(hash: String): Transaction? =
         transactionDao.findByFingerprint(hash)?.toDomain()
 
+    suspend fun findByFingerprintSince(hash: String, sinceMillis: Long): Transaction? =
+        transactionDao.findByFingerprintSince(hash, sinceMillis)?.toDomain()
+
     suspend fun getExpenseTotal(start: LocalDate, end: LocalDate): Long {
         val startTime = start.startOfDayMillis()
         val endTime = end.endExclusiveMillis()

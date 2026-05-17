@@ -58,6 +58,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -479,6 +481,7 @@ fun TagSelector(
     var showSearch by remember { mutableStateOf(false) }
     var tagSearch by remember { mutableStateOf("") }
     var newTagName by remember { mutableStateOf("") }
+    val searchFocusRequester = remember { FocusRequester() }
     val filteredTags = remember(tags, tagSearch) {
         if (tagSearch.isBlank()) tags
         else tags.filter { it.name.contains(tagSearch.trim(), ignoreCase = true) }
@@ -530,6 +533,9 @@ fun TagSelector(
         }
 
         if (showSearch) {
+            LaunchedEffect(Unit) {
+                searchFocusRequester.requestFocus()
+            }
             OutlinedTextField(
                 value = tagSearch,
                 onValueChange = { tagSearch = it },
@@ -546,7 +552,9 @@ fun TagSelector(
                     }
                 },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(searchFocusRequester),
                 colors = fieldColors()
             )
             if (filteredTags.isEmpty()) {

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -58,7 +59,6 @@ import com.expensetracker.app.ui.theme.GlassPanel
 import com.expensetracker.app.ui.theme.GlowProgressBar
 import com.expensetracker.app.ui.theme.NeonPill
 import com.expensetracker.app.ui.theme.ScreenEdgePadding
-import com.expensetracker.app.ui.theme.SectionHeader
 import com.expensetracker.app.ui.theme.appButtonSizing
 import java.text.NumberFormat
 import java.util.Locale
@@ -102,7 +102,7 @@ fun BudgetSetupScreen(
                 end    = ScreenEdgePadding,
                 bottom = 110.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
                 BudgetHeroCard(
@@ -113,14 +113,11 @@ fun BudgetSetupScreen(
 
             item {
                 GlassPanel(
-                    modifier = Modifier.fillMaxWidth(),
-                    accent   = MaterialTheme.colorScheme.primary
+                    modifier       = Modifier.fillMaxWidth(),
+                    accent         = MaterialTheme.colorScheme.primary,
+                    contentPadding = PaddingValues(16.dp)
                 ) {
-                    SectionHeader(
-                        eyebrow  = "Adjust",
-                        title    = "Drag to set limit",
-                        subtitle = "Slide to pick your cap, or tap a preset below."
-                    )
+                    // ── Slider + presets ───────────────────────────────────
                     BudgetSlider(
                         value         = sliderValue,
                         onValueChange = { viewModel.updateAmount(it.roundToInt().toString()) }
@@ -129,36 +126,35 @@ fun BudgetSetupScreen(
                         onSelect       = { viewModel.updateAmount(it.toString()) },
                         selectedRupees = uiState.amount.toDoubleOrNull()?.toLong()
                     )
-                }
-            }
 
-            item {
-                GlassPanel(
-                    modifier = Modifier.fillMaxWidth(),
-                    accent   = MaterialTheme.colorScheme.secondary
-                ) {
-                    SectionHeader(
-                        eyebrow = "Details",
-                        title   = "Name your budget"
-                    )
-                    OutlinedTextField(
-                        value         = uiState.budgetName,
-                        onValueChange = viewModel::updateBudgetName,
-                        label         = { Text("Budget Name") },
-                        singleLine    = true,
-                        modifier      = Modifier.fillMaxWidth(),
-                        colors        = budgetFieldColors()
-                    )
-                    OutlinedTextField(
-                        value           = uiState.amount,
-                        onValueChange   = viewModel::updateAmount,
-                        label           = { Text("Exact Amount (₹)") },
-                        leadingIcon     = { Text("₹", fontWeight = FontWeight.SemiBold) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine      = true,
-                        modifier        = Modifier.fillMaxWidth(),
-                        colors          = budgetFieldColors()
-                    )
+                    // ── Thin divider ───────────────────────────────────────
+                    AccentDivider(accent = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
+
+                    // ── Name + amount fields side by side ──────────────────
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value         = uiState.budgetName,
+                            onValueChange = viewModel::updateBudgetName,
+                            label         = { Text("Name") },
+                            singleLine    = true,
+                            modifier      = Modifier.weight(1f),
+                            colors        = budgetFieldColors()
+                        )
+                        OutlinedTextField(
+                            value           = uiState.amount,
+                            onValueChange   = viewModel::updateAmount,
+                            label           = { Text("Amount") },
+                            leadingIcon     = { Text("₹", fontWeight = FontWeight.SemiBold) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine      = true,
+                            modifier        = Modifier.weight(1f),
+                            colors          = budgetFieldColors()
+                        )
+                    }
+
                     uiState.error?.let { error ->
                         Text(
                             text       = error,
@@ -167,27 +163,35 @@ fun BudgetSetupScreen(
                             fontWeight = FontWeight.Medium
                         )
                     }
-                }
-            }
 
-            item {
-                GradientSaveButton(
-                    isSaving = uiState.isSaving,
-                    onClick  = viewModel::saveBudget
-                )
-            }
-
-            if (uiState.existingAmountMinor != null) {
-                item {
-                    TextButton(
-                        onClick  = viewModel::removeBudget,
-                        enabled  = !uiState.isSaving,
-                        modifier = Modifier.fillMaxWidth().appButtonSizing()
-                    ) {
-                        Icon(Icons.Default.DeleteOutline, contentDescription = null)
-                        Text(
-                            text     = "Remove Budget",
-                            modifier = Modifier.padding(start = 8.dp)
+                    // ── Action buttons ─────────────────────────────────────
+                    if (uiState.existingAmountMinor != null) {
+                        Row(
+                            modifier              = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            GradientSaveButton(
+                                isSaving = uiState.isSaving,
+                                onClick  = viewModel::saveBudget,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(
+                                onClick  = viewModel::removeBudget,
+                                enabled  = !uiState.isSaving,
+                                modifier = Modifier.height(52.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.DeleteOutline,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        GradientSaveButton(
+                            isSaving = uiState.isSaving,
+                            onClick  = viewModel::saveBudget,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -375,14 +379,13 @@ private fun PresetChips(onSelect: (Long) -> Unit, selectedRupees: Long?) {
 }
 
 @Composable
-private fun GradientSaveButton(isSaving: Boolean, onClick: () -> Unit) {
+private fun GradientSaveButton(isSaving: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val primary   = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
     val alphaMod  = if (isSaving) 0.45f else 1f
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .appButtonSizing()
             .clip(MaterialTheme.shapes.large)
             .background(
