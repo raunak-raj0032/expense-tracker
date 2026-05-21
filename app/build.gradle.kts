@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -9,6 +11,28 @@ val googleServicesFile = file("google-services.json")
 if (googleServicesFile.exists()) {
     apply(plugin = "com.google.gms.google-services")
 }
+
+val releaseSigningPropertiesFile = rootProject.file("release-signing.properties")
+val releaseSigningProperties = Properties().apply {
+    if (releaseSigningPropertiesFile.exists()) {
+        releaseSigningPropertiesFile.inputStream().use(::load)
+    }
+}
+
+fun releaseSigningValue(propertyName: String, environmentName: String): String? =
+    releaseSigningProperties.getProperty(propertyName)?.takeIf { it.isNotBlank() }
+        ?: System.getenv(environmentName)?.takeIf { it.isNotBlank() }
+
+val releaseStoreFilePath = releaseSigningValue("storeFile", "RELEASE_STORE_FILE")
+val releaseStorePassword = releaseSigningValue("storePassword", "RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = releaseSigningValue("keyAlias", "RELEASE_KEY_ALIAS")
+val releaseKeyPassword = releaseSigningValue("keyPassword", "RELEASE_KEY_PASSWORD")
+val hasReleaseSigning = listOf(
+    releaseStoreFilePath,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword
+).all { !it.isNullOrBlank() }
 
 android {
     namespace = "com.expensetracker.app"
@@ -32,10 +56,24 @@ android {
         }
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFilePath!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

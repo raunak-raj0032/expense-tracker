@@ -38,14 +38,11 @@ class AppActivityWorker @AssistedInject constructor(
             return Result.success()
         }
 
-        val hoursAway = if (forceSend) 4 else elapsedMs / (60 * 60 * 1000)
         val firstName = getFirstName()
 
-        val title = "Hey, missing you! 👋"
-        val body = if (firstName.isNotBlank()) {
-            "$firstName, you've been away for $hoursAway hours. Log today's expenses to stay on track!"
-        } else {
-            "You haven't opened Pocket Pulse in $hoursAway hours. Come log today's expenses!"
+        val title = reminderTitles.random()
+        val body = reminderBodies.random().let { message ->
+            if (firstName.isNotBlank()) "$firstName, $message" else message.replaceFirstChar { it.uppercase() }
         }
 
         NotificationHelper.showNotification(
@@ -65,4 +62,25 @@ class AppActivityWorker @AssistedInject constructor(
         val authState = authRepository.authState.first()
         return (authState as? AuthState.SignedIn)?.user?.firstName.orEmpty()
     }
+
+    private val reminderTitles = listOf(
+        "Tiny money check-in",
+        "Penny has a pocket note",
+        "Quick expense sparkle",
+        "Make future-you smile",
+        "Pocket Pulse nudge"
+    )
+
+    private val reminderBodies = listOf(
+        "ready for a tiny money tidy-up? Add today's spends before they sneak away.",
+        "a few taps now can save a lot of guesswork later. Log today's expenses?",
+        "your budget buddy is cheering for you. Capture today's little spends.",
+        "small habits build calm wallets. Add today's expense trail.",
+        "turn today's receipts into clarity. Pocket Pulse is ready when you are.",
+        "give your future self a clean ledger. Log today's spends in a minute.",
+        "every tracked rupee is a tiny win. Add what you spent today.",
+        "quick check-in: did any snacks, rides, or UPI payments need a home?",
+        "money mysteries are easier when the clues are fresh. Add today's notes.",
+        "keep the streak cozy. A quick log now keeps your budget glowing."
+    )
 }

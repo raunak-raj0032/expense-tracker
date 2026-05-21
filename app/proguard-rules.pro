@@ -11,3 +11,4 @@
 
 -dontwarn javax.annotation.**
 -dontwarn kotlin.**
+-dontwarn com.gemalto.jp2.**
