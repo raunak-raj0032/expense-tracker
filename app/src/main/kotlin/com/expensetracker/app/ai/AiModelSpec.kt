@@ -6,11 +6,16 @@ package com.expensetracker.app.ai
  * migrate cached weights when we bump it.
  */
 object AiModelSpec {
-    const val VERSION = "gemma-3n-e2b-it-litert-lm-v1"
-    const val FILE_NAME = "gemma-3n-e2b-it.litertlm"
+    const val VERSION = "gemma-3n-e2b-it-int4-litertlm-v1"
+    const val DISPLAY_NAME = "Gemma 3n E2B IT INT4"
+    const val MODEL_ID = "google/gemma-3n-E2B-it-litert-lm"
+    const val FILE_NAME = "gemma-3n-E2B-it-int4.litertlm"
 
-    // Filled in during Phase 3 once hosting + SHA-256 are confirmed.
-    const val DOWNLOAD_URL = ""
+    // Replace with the private CDN URL before enabling this in a public build.
+    const val DOWNLOAD_URL = "https://cdn.example.com/models/gemma-3n-E2B-it-int4.litertlm"
+
+    // Keep validation opt-in until the exact CDN artifact hash/byte count are fixed.
     const val EXPECTED_SHA256 = ""
     const val EXPECTED_SIZE_BYTES = 0L
+    const val DISPLAY_SIZE_BYTES = 3_660_000_000L
 }

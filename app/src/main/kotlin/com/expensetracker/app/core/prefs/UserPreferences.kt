@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.expensetracker.app.ai.AiBackend
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -14,9 +15,12 @@ import javax.inject.Singleton
 
 data class AiModelState(
     val enabled: Boolean,
+    val backend: AiBackend,
     val lastError: String,
     val endpoint: String,
-    val modelName: String
+    val modelName: String,
+    val localModelVersion: String,
+    val localModelPath: String
 )
 
 const val DEFAULT_AI_MODEL_NAME: String = "llama3.2:3b"
@@ -31,9 +35,12 @@ class UserPreferences @Inject constructor(
     private val biometricKey = booleanPreferencesKey("biometric_enabled")
     private val homeCurrencyKey = stringPreferencesKey("home_currency")
     private val aiEnabledKey = booleanPreferencesKey("ai_enabled")
+    private val aiBackendKey = stringPreferencesKey("ai_backend")
     private val aiLastErrorKey = stringPreferencesKey("ai_last_error")
     private val aiEndpointKey = stringPreferencesKey("ai_endpoint")
     private val aiModelNameKey = stringPreferencesKey("ai_model_name")
+    private val aiLocalModelVersionKey = stringPreferencesKey("ai_local_model_version")
+    private val aiLocalModelPathKey = stringPreferencesKey("ai_local_model_path")
     private val budgetNotifEnabledKey = booleanPreferencesKey("budget_notif_enabled")
     private val budgetNotifPeriodKey = stringPreferencesKey("budget_notif_period")
     private val budgetWidgetPeriodKey = stringPreferencesKey("budget_widget_period")
@@ -54,11 +61,16 @@ class UserPreferences @Inject constructor(
     val profilePicturePath: Flow<String> = context.userPrefsDataStore.data.map { it[profilePicturePathKey].orEmpty() }
 
     val aiModelState: Flow<AiModelState> = context.userPrefsDataStore.data.map { prefs ->
+        val endpoint = prefs[aiEndpointKey].orEmpty()
         AiModelState(
             enabled = prefs[aiEnabledKey] ?: false,
+            backend = AiBackend.fromStoredName(prefs[aiBackendKey])
+                ?: if (endpoint.isNotBlank()) AiBackend.OLLAMA else AiBackend.LOCAL,
             lastError = prefs[aiLastErrorKey].orEmpty(),
-            endpoint = prefs[aiEndpointKey].orEmpty(),
-            modelName = prefs[aiModelNameKey] ?: DEFAULT_AI_MODEL_NAME
+            endpoint = endpoint,
+            modelName = prefs[aiModelNameKey] ?: DEFAULT_AI_MODEL_NAME,
+            localModelVersion = prefs[aiLocalModelVersionKey].orEmpty(),
+            localModelPath = prefs[aiLocalModelPathKey].orEmpty()
         )
     }
 
@@ -76,6 +88,13 @@ class UserPreferences @Inject constructor(
 
     suspend fun setAiEnabled(enabled: Boolean) {
         context.userPrefsDataStore.edit { it[aiEnabledKey] = enabled }
+    }
+
+    suspend fun setAiBackend(backend: AiBackend) {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[aiBackendKey] = backend.storedName
+            prefs.remove(aiLastErrorKey)
+        }
     }
 
     suspend fun setAiLastError(message: String) {
@@ -98,6 +117,23 @@ class UserPreferences @Inject constructor(
                 prefs[aiModelNameKey] = cleaned
             }
             prefs.remove(aiLastErrorKey)
+        }
+    }
+
+    suspend fun setLocalAiModelInstalled(version: String, path: String) {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs[aiLocalModelVersionKey] = version
+            prefs[aiLocalModelPathKey] = path
+            prefs.remove(aiLastErrorKey)
+        }
+    }
+
+    suspend fun clearLocalAiModelState() {
+        context.userPrefsDataStore.edit { prefs ->
+            prefs.remove(aiLocalModelVersionKey)
+            prefs.remove(aiLocalModelPathKey)
+            prefs.remove(aiLastErrorKey)
+            prefs[aiEnabledKey] = false
         }
     }
 
@@ -138,9 +174,12 @@ class UserPreferences @Inject constructor(
             put("biometric_enabled", prefs[biometricKey] ?: false)
             put("home_currency", prefs[homeCurrencyKey] ?: "INR")
             put("ai_enabled", prefs[aiEnabledKey] ?: false)
+            put("ai_backend", prefs[aiBackendKey] ?: AiBackend.LOCAL.storedName)
             put("ai_last_error", prefs[aiLastErrorKey].orEmpty())
             put("ai_endpoint", prefs[aiEndpointKey].orEmpty())
             put("ai_model_name", prefs[aiModelNameKey] ?: DEFAULT_AI_MODEL_NAME)
+            put("ai_local_model_version", prefs[aiLocalModelVersionKey].orEmpty())
+            put("ai_local_model_path", prefs[aiLocalModelPathKey].orEmpty())
             put("budget_notif_enabled", prefs[budgetNotifEnabledKey] ?: false)
             put("budget_notif_period", prefs[budgetNotifPeriodKey] ?: "MONTHLY")
             put("budget_widget_period", prefs[budgetWidgetPeriodKey] ?: "MONTHLY")
@@ -156,9 +195,12 @@ class UserPreferences @Inject constructor(
             values["biometric_enabled"]?.let { prefs[biometricKey] = it as Boolean }
             values["home_currency"]?.let { prefs[homeCurrencyKey] = it as String }
             values["ai_enabled"]?.let { prefs[aiEnabledKey] = it as Boolean }
+            values["ai_backend"]?.let { prefs[aiBackendKey] = it as String }
             values["ai_last_error"]?.let { prefs[aiLastErrorKey] = it as String }
             values["ai_endpoint"]?.let { prefs[aiEndpointKey] = it as String }
             values["ai_model_name"]?.let { prefs[aiModelNameKey] = it as String }
+            values["ai_local_model_version"]?.let { prefs[aiLocalModelVersionKey] = it as String }
+            values["ai_local_model_path"]?.let { prefs[aiLocalModelPathKey] = it as String }
             values["budget_notif_enabled"]?.let { prefs[budgetNotifEnabledKey] = it as Boolean }
             values["budget_notif_period"]?.let { prefs[budgetNotifPeriodKey] = it as String }
             values["budget_widget_period"]?.let { prefs[budgetWidgetPeriodKey] = it as String }
@@ -172,6 +214,9 @@ class UserPreferences @Inject constructor(
         context.userPrefsDataStore.edit { prefs ->
             prefs.remove(aiLastErrorKey)
             prefs.remove(aiEndpointKey)
+            prefs.remove(aiLocalModelVersionKey)
+            prefs.remove(aiLocalModelPathKey)
+            prefs[aiEnabledKey] = false
         }
     }
 }

@@ -5,6 +5,7 @@ import androidx.biometric.BiometricManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expensetracker.app.ai.AiAvailability
+import com.expensetracker.app.ai.AiBackend
 import com.expensetracker.app.ai.OnDeviceAiManager
 import com.expensetracker.app.budget.BudgetNotificationService
 import com.expensetracker.app.budget.BudgetPeriod
@@ -71,6 +72,10 @@ class SettingsViewModel @Inject constructor(
         .map { it.enabled }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val aiBackend: StateFlow<AiBackend> = userPreferences.aiModelState
+        .map { it.backend }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, AiBackend.LOCAL)
+
     val aiEndpoint: StateFlow<String> = userPreferences.aiModelState
         .map { it.endpoint }
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")
@@ -89,10 +94,31 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setAiBackend(backend: AiBackend) {
+        viewModelScope.launch {
+            userPreferences.setAiBackend(backend)
+            userPreferences.setAiEnabled(false)
+            _message.value = "AI backend set to ${backend.label}."
+        }
+    }
+
+    fun downloadLocalAiModel() {
+        if (_aiBusy.value) return
+        _aiBusy.value = true
+        viewModelScope.launch {
+            userPreferences.setAiBackend(AiBackend.LOCAL)
+            onDeviceAiManager.downloadModel()
+                .onSuccess { _message.value = "Local AI model installed." }
+                .onFailure { _message.value = it.message ?: "Could not download local AI model." }
+            _aiBusy.value = false
+        }
+    }
+
     fun saveAndTestAiHost(endpoint: String, modelName: String) {
         if (_aiBusy.value) return
         _aiBusy.value = true
         viewModelScope.launch {
+            userPreferences.setAiBackend(AiBackend.OLLAMA)
             userPreferences.setAiModelName(modelName)
             userPreferences.setAiEndpoint(endpoint)
             onDeviceAiManager.initializeIfNeeded()

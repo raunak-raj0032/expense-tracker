@@ -53,6 +53,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -93,7 +94,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expensetracker.app.ai.AiAvailability
+import com.expensetracker.app.ai.AiBackend
 import com.expensetracker.app.ai.AiCompatibility
+import com.expensetracker.app.ai.AiModelSpec
 import com.expensetracker.app.budget.BudgetPeriod
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -136,6 +139,7 @@ fun SettingsScreen(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val aiAvailability by viewModel.aiAvailability.collectAsStateWithLifecycle()
     val aiEnabled by viewModel.aiEnabled.collectAsStateWithLifecycle()
+    val aiBackend by viewModel.aiBackend.collectAsStateWithLifecycle()
     val aiBusy by viewModel.aiBusy.collectAsStateWithLifecycle()
     val budgetNotifEnabled by viewModel.budgetNotifEnabled.collectAsStateWithLifecycle()
     val budgetNotifPeriod by viewModel.budgetNotifPeriod.collectAsStateWithLifecycle()
@@ -309,10 +313,13 @@ fun SettingsScreen(
                 AiSettingsCard(
                     availability = aiAvailability,
                     aiEnabled = aiEnabled,
+                    backend = aiBackend,
                     endpoint = aiEndpoint,
                     modelName = aiModelName,
                     busy = aiBusy,
                     onToggleEnabled = viewModel::setAiEnabled,
+                    onBackendChange = viewModel::setAiBackend,
+                    onDownloadLocal = viewModel::downloadLocalAiModel,
                     onSaveAndTest = viewModel::saveAndTestAiHost,
                     onDelete = viewModel::deleteAiModel
                 )
@@ -827,10 +834,13 @@ private fun shareDiagnosticLog(context: Context) {
 private fun AiSettingsCard(
     availability: AiAvailability,
     aiEnabled: Boolean,
+    backend: AiBackend,
     endpoint: String,
     modelName: String,
     busy: Boolean,
     onToggleEnabled: (Boolean) -> Unit,
+    onBackendChange: (AiBackend) -> Unit,
+    onDownloadLocal: () -> Unit,
     onSaveAndTest: (String, String) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -854,8 +864,8 @@ private fun AiSettingsCard(
                 ) { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp)) }
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Connect AI Provider", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                    Text(aiStatusLine(availability), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("AI Assistant", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text(aiStatusLine(availability, backend), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (availability !is AiAvailability.Unsupported) {
                     Switch(
@@ -872,47 +882,104 @@ private fun AiSettingsCard(
                 }
             }
 
-            OutlinedTextField(
-                value = editingEndpoint,
-                onValueChange = { editingEndpoint = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("Ollama host URL") },
-                supportingText = {
-                    Text("LAN: http://<laptop-ip>:11434  ·  Tunnel: https://*.trycloudflare.com")
-                }
-            )
-
-            OutlinedTextField(
-                value = editingModel,
-                onValueChange = { editingModel = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("Model name") },
-                supportingText = {
-                    Text("Must be pulled on the host, e.g. llama3.2:3b or llama3.2:1b for faster replies")
-                }
-            )
-
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
-                    onClick = { onSaveAndTest(editingEndpoint, editingModel) },
-                    enabled = !busy && editingEndpoint.isNotBlank() && editingModel.isNotBlank(),
-                    colors = ButtonDefaults.textButtonColors(contentColor = accent)
-                ) {
-                    val label = when {
-                        busy -> "Testing..."
-                        dirty -> "Save & test"
-                        else -> "Re-test host"
-                    }
-                    Text(label)
-                }
-                if (availability is AiAvailability.Ready || availability is AiAvailability.Error) {
-                    TextButton(
-                        onClick = onDelete,
+                AiBackend.entries.forEach { option ->
+                    FilterChip(
+                        selected = backend == option,
+                        onClick = { onBackendChange(option) },
                         enabled = !busy,
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    ) { Text("Forget host") }
+                        label = { Text(option.label) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = accent.copy(alpha = 0.18f),
+                            selectedLabelColor = accent
+                        )
+                    )
+                }
+            }
+
+            if (backend == AiBackend.LOCAL) {
+                Text(
+                    "${AiModelSpec.DISPLAY_NAME} (${formatBytes(AiModelSpec.DISPLAY_SIZE_BYTES)}) downloads into app storage and runs locally after the runtime is installed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                when (val state = availability) {
+                    is AiAvailability.Downloading -> {
+                        val progress = if (state.totalBytes > 0L) state.downloadedBytes.toFloat() / state.totalBytes.toFloat() else 0f
+                        LinearProgressIndicator(
+                            progress = { progress.coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth(),
+                            color = accent
+                        )
+                        Text(
+                            "Downloading... ${formatBytes(state.downloadedBytes)} / ${formatBytes(state.totalBytes)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    else -> Unit
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (availability is AiAvailability.NeedsDownload || availability is AiAvailability.Error) {
+                        Button(
+                            onClick = onDownloadLocal,
+                            enabled = !busy && availability !is AiAvailability.Unsupported,
+                            modifier = Modifier.weight(1f)
+                        ) { Text(if (busy) "Downloading..." else "Download model") }
+                    }
+                    if (availability is AiAvailability.Ready || availability is AiAvailability.Error) {
+                        TextButton(
+                            onClick = onDelete,
+                            enabled = !busy,
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) { Text("Delete model") }
+                    }
+                }
+            } else {
+                OutlinedTextField(
+                    value = editingEndpoint,
+                    onValueChange = { editingEndpoint = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Ollama host URL") },
+                    supportingText = {
+                        Text("LAN: http://<laptop-ip>:11434  ·  Tunnel: https://*.trycloudflare.com")
+                    }
+                )
+
+                OutlinedTextField(
+                    value = editingModel,
+                    onValueChange = { editingModel = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Model name") },
+                    supportingText = {
+                        Text("Must be pulled on the host, e.g. llama3.2:3b or llama3.2:1b for faster replies")
+                    }
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = { onSaveAndTest(editingEndpoint, editingModel) },
+                        enabled = !busy && editingEndpoint.isNotBlank() && editingModel.isNotBlank(),
+                        colors = ButtonDefaults.textButtonColors(contentColor = accent)
+                    ) {
+                        val label = when {
+                            busy -> "Testing..."
+                            dirty -> "Save & test"
+                            else -> "Re-test host"
+                        }
+                        Text(label)
+                    }
+                    if (availability is AiAvailability.Ready || availability is AiAvailability.Error) {
+                        TextButton(
+                            onClick = onDelete,
+                            enabled = !busy,
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) { Text("Forget host") }
+                    }
                 }
             }
 
@@ -926,7 +993,7 @@ private fun AiSettingsCard(
                 }
                 AiAvailability.NeedsDownload -> {
                     Text(
-                        "Enter your Ollama host URL and tap Save & test.",
+                        if (backend == AiBackend.LOCAL) "Download the optional local model to use offline AI features." else "Enter your Ollama host URL and tap Save & test.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -951,11 +1018,11 @@ private fun AiSettingsCard(
     }
 }
 
-private fun aiStatusLine(availability: AiAvailability): String = when (availability) {
+private fun aiStatusLine(availability: AiAvailability, backend: AiBackend): String = when (availability) {
     is AiAvailability.Unsupported -> "Disabled for local-only privacy"
-    AiAvailability.NeedsDownload -> "Configure the laptop Ollama host."
+    AiAvailability.NeedsDownload -> if (backend == AiBackend.LOCAL) "Optional local model is not downloaded." else "Configure the laptop Ollama host."
     is AiAvailability.Downloading -> "Downloading model..."
-    AiAvailability.Ready -> "Ready. Phones can connect to your AI provider."
+    AiAvailability.Ready -> if (backend == AiBackend.LOCAL) "Ready. AI model is installed on this device." else "Ready. Phones can connect to your AI provider."
     AiAvailability.Initializing -> "Checking compatibility..."
     is AiAvailability.Error -> "Something went wrong"
 }
