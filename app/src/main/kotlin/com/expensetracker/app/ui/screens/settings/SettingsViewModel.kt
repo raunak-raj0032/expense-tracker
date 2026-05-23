@@ -84,6 +84,9 @@ class SettingsViewModel @Inject constructor(
         .map { it.modelName }
         .stateIn(viewModelScope, SharingStarted.Eagerly, DEFAULT_AI_MODEL_NAME)
 
+    val hfToken: StateFlow<String> = userPreferences.hfToken
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
     private val _aiBusy = MutableStateFlow(false)
     val aiBusy: StateFlow<Boolean> = _aiBusy.asStateFlow()
 
@@ -100,6 +103,10 @@ class SettingsViewModel @Inject constructor(
             userPreferences.setAiEnabled(false)
             _message.value = "AI backend set to ${backend.label}."
         }
+    }
+
+    fun setHfToken(token: String) {
+        viewModelScope.launch { userPreferences.setHfToken(token) }
     }
 
     fun downloadLocalAiModel() {

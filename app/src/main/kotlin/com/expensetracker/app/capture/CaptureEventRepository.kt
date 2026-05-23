@@ -204,6 +204,10 @@ class CaptureEventRepository @Inject constructor(
         captureEventDao.markIgnored(eventId)
     }
 
+    suspend fun ignoreAll() {
+        captureEventDao.markAllIgnored()
+    }
+
     private suspend fun storeCaptureEvent(
         sourceKey: String?,
         sourceType: CaptureSourceType,

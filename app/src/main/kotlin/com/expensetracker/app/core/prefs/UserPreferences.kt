@@ -47,6 +47,7 @@ class UserPreferences @Inject constructor(
     private val firstRunPermissionsPromptedKey = booleanPreferencesKey("first_run_permissions_prompted")
     private val tutorialSeenKey = booleanPreferencesKey("tutorial_seen")
     private val profilePicturePathKey = stringPreferencesKey("profile_picture_path")
+    private val hfTokenKey = stringPreferencesKey("hf_token")
 
     val onboardingSeen: Flow<Boolean> = context.userPrefsDataStore.data.map { it[onboardingKey] ?: false }
     val biometricEnabled: Flow<Boolean> = context.userPrefsDataStore.data.map { it[biometricKey] ?: false }
@@ -59,6 +60,7 @@ class UserPreferences @Inject constructor(
     val tutorialSeen: Flow<Boolean> =
         context.userPrefsDataStore.data.map { it[tutorialSeenKey] ?: false }
     val profilePicturePath: Flow<String> = context.userPrefsDataStore.data.map { it[profilePicturePathKey].orEmpty() }
+    val hfToken: Flow<String> = context.userPrefsDataStore.data.map { it[hfTokenKey].orEmpty() }
 
     val aiModelState: Flow<AiModelState> = context.userPrefsDataStore.data.map { prefs ->
         val endpoint = prefs[aiEndpointKey].orEmpty()
@@ -155,6 +157,12 @@ class UserPreferences @Inject constructor(
 
     suspend fun setTutorialSeen(seen: Boolean) {
         context.userPrefsDataStore.edit { it[tutorialSeenKey] = seen }
+    }
+
+    suspend fun setHfToken(token: String) {
+        context.userPrefsDataStore.edit { prefs ->
+            if (token.isBlank()) prefs.remove(hfTokenKey) else prefs[hfTokenKey] = token.trim()
+        }
     }
 
     suspend fun setProfilePicturePath(path: String) {

@@ -41,8 +41,9 @@ class LocalSlmAiManager @Inject constructor(
             error("This device does not meet the local AI requirements.")
         }
         val temp = modelStore.prepareTempFile()
+        val token = userPreferences.hfToken.first()
         downloadState.value = AiAvailability.Downloading(0L, AiModelSpec.DISPLAY_SIZE_BYTES)
-        downloader.download(temp) { downloaded, total ->
+        downloader.download(temp, token) { downloaded, total ->
             downloadState.value = AiAvailability.Downloading(downloaded, total)
         }
         val installed = modelStore.installVerifiedTemp()

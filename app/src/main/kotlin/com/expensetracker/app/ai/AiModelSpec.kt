@@ -11,8 +11,8 @@ object AiModelSpec {
     const val MODEL_ID = "google/gemma-3n-E2B-it-litert-lm"
     const val FILE_NAME = "gemma-3n-E2B-it-int4.litertlm"
 
-    // Replace with the private CDN URL before enabling this in a public build.
-    const val DOWNLOAD_URL = "https://cdn.example.com/models/gemma-3n-E2B-it-int4.litertlm"
+    const val DOWNLOAD_URL =
+        "https://huggingface.co/google/gemma-3n-E2B-it-litert-lm/resolve/main/gemma-3n-E2B-it-int4.litertlm"
 
     // Keep validation opt-in until the exact CDN artifact hash/byte count are fixed.
     const val EXPECTED_SHA256 = ""

@@ -15,6 +15,7 @@ class LocalModelDownloader @Inject constructor() {
 
     suspend fun download(
         target: File,
+        hfToken: String = "",
         onProgress: suspend (downloadedBytes: Long, totalBytes: Long) -> Unit
     ) = withContext(Dispatchers.IO) {
         if (AiModelSpec.DOWNLOAD_URL.isBlank()) {
@@ -26,6 +27,7 @@ class LocalModelDownloader @Inject constructor() {
             connectTimeout = 15_000
             readTimeout = 60_000
             instanceFollowRedirects = true
+            if (hfToken.isNotBlank()) setRequestProperty("Authorization", "Bearer $hfToken")
         }
         try {
             val code = connection.responseCode

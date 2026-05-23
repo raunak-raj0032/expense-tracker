@@ -145,6 +145,7 @@ fun SettingsScreen(
     val budgetNotifPeriod by viewModel.budgetNotifPeriod.collectAsStateWithLifecycle()
     val aiEndpoint by viewModel.aiEndpoint.collectAsStateWithLifecycle()
     val aiModelName by viewModel.aiModelName.collectAsStateWithLifecycle()
+    val hfToken by viewModel.hfToken.collectAsStateWithLifecycle()
     val importingSms by viewModel.importingSms.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -316,9 +317,11 @@ fun SettingsScreen(
                     backend = aiBackend,
                     endpoint = aiEndpoint,
                     modelName = aiModelName,
+                    hfToken = hfToken,
                     busy = aiBusy,
                     onToggleEnabled = viewModel::setAiEnabled,
                     onBackendChange = viewModel::setAiBackend,
+                    onSaveHfToken = viewModel::setHfToken,
                     onDownloadLocal = viewModel::downloadLocalAiModel,
                     onSaveAndTest = viewModel::saveAndTestAiHost,
                     onDelete = viewModel::deleteAiModel
@@ -837,9 +840,11 @@ private fun AiSettingsCard(
     backend: AiBackend,
     endpoint: String,
     modelName: String,
+    hfToken: String,
     busy: Boolean,
     onToggleEnabled: (Boolean) -> Unit,
     onBackendChange: (AiBackend) -> Unit,
+    onSaveHfToken: (String) -> Unit,
     onDownloadLocal: () -> Unit,
     onSaveAndTest: (String, String) -> Unit,
     onDelete: () -> Unit
@@ -847,7 +852,9 @@ private fun AiSettingsCard(
     val accent = MaterialTheme.colorScheme.tertiary
     var editingEndpoint by remember(endpoint) { mutableStateOf(endpoint) }
     var editingModel by remember(modelName) { mutableStateOf(modelName) }
+    var editingHfToken by remember(hfToken) { mutableStateOf(hfToken) }
     val dirty = editingEndpoint.trim() != endpoint || editingModel.trim() != modelName
+    val hfTokenDirty = editingHfToken.trim() != hfToken
 
     Box(
         modifier = Modifier
@@ -920,6 +927,22 @@ private fun AiSettingsCard(
                     }
                     else -> Unit
                 }
+
+                OutlinedTextField(
+                    value = editingHfToken,
+                    onValueChange = { editingHfToken = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("HuggingFace token") },
+                    supportingText = { Text("Required to download the gated Gemma model. Get one at huggingface.co/settings/tokens") },
+                    trailingIcon = {
+                        if (hfTokenDirty) {
+                            TextButton(onClick = { onSaveHfToken(editingHfToken.trim()) }) {
+                                Text("Save", color = accent)
+                            }
+                        }
+                    }
+                )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (availability is AiAvailability.NeedsDownload || availability is AiAvailability.Error) {

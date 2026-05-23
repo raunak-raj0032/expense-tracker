@@ -95,6 +95,14 @@ class CaptureReviewViewModel @Inject constructor(
         }
     }
 
+    fun ignoreAll() {
+        viewModelScope.launch {
+            runCatching { captureEventRepository.ignoreAll() }
+                .onSuccess { _uiState.update { it.copy(message = "All suggestions ignored.") } }
+                .onFailure { _uiState.update { it.copy(message = it.message ?: "Unable to ignore all suggestions.") } }
+        }
+    }
+
     fun clearMessage() {
         _uiState.update { it.copy(message = null) }
     }
