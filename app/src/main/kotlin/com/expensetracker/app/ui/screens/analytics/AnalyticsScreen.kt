@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -394,11 +395,13 @@ private fun DailySpendCard(
     val chartH  = 72.dp
     val barW    = 20.dp
 
+    var selectedDay by remember(points) { mutableStateOf(todayDay.takeIf { it > 0 }) }
+
     GlassPanel(modifier = Modifier.fillMaxWidth(), accent = MaterialTheme.colorScheme.error) {
         SectionHeader(
             eyebrow  = "DAILY SPEND",
             title    = "Day-by-day activity",
-            subtitle = "Scroll to see the full month"
+            subtitle = "Tap a bar to see the amount"
         )
 
         Row(
@@ -408,36 +411,40 @@ private fun DailySpendCard(
             horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             points.forEach { point ->
-                val isToday = point.day == todayDay
-                val frac    = point.expenseMinor.toFloat() / maxExp.toFloat()
+                val isToday    = point.day == todayDay
+                val isSelected = point.day == selectedDay
+                val frac = point.expenseMinor.toFloat() / maxExp.toFloat()
                 val color = when {
-                    isToday && point.expenseMinor > 0 -> MaterialTheme.colorScheme.primary
-                    isToday                           -> MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                    point.expenseMinor > 0            -> MaterialTheme.colorScheme.error.copy(alpha = 0.45f + 0.55f * frac)
-                    else                              -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    isSelected && point.expenseMinor > 0 -> MaterialTheme.colorScheme.primary
+                    isSelected                           -> MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                    point.expenseMinor > 0               -> MaterialTheme.colorScheme.error.copy(alpha = 0.45f + 0.55f * frac)
+                    else                                 -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
                 }
-                val labelColor = if (isToday) MaterialTheme.colorScheme.primary else Color.Unspecified
+                val labelColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Unspecified
                 BarCol(
                     fraction    = if (point.expenseMinor > 0) frac else 0f,
                     color       = color,
                     chartHeight = chartH,
                     label       = "${point.day}",
-                    modifier    = Modifier.width(barW),
+                    modifier    = Modifier.width(barW).clickable { selectedDay = point.day },
                     labelColor  = labelColor
                 )
             }
         }
 
-        if (todayDay > 0) {
-            val todayAmt = points.find { it.day == todayDay }?.expenseMinor ?: 0L
+        val selPoint = points.find { it.day == selectedDay }
+        if (selPoint != null) {
+            val label = if (selPoint.day == todayDay) "Today" else "Day ${selPoint.day}"
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                NeonPill(text = "Today ${formatAmount(todayAmt)}", accent = MaterialTheme.colorScheme.primary)
+                NeonPill(text = "$label  ${formatAmount(selPoint.expenseMinor)}", accent = MaterialTheme.colorScheme.primary)
                 if (avgDailySpend > 0)
                     NeonPill(text = "Avg ${formatAmount(avgDailySpend)}/day", accent = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        } else if (avgDailySpend > 0) {
+            NeonPill(text = "Avg ${formatAmount(avgDailySpend)}/day", accent = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -448,11 +455,13 @@ private fun WeeklyRhythmCard(weekdayPoints: List<WeekdayPoint>) {
     val peakDay  = weekdayPoints.maxByOrNull { it.expenseMinor }?.label
     val chartH   = 80.dp
 
+    var selectedLabel by remember(weekdayPoints) { mutableStateOf(peakDay) }
+
     GlassPanel(modifier = Modifier.fillMaxWidth(), accent = MaterialTheme.colorScheme.tertiary) {
         SectionHeader(
             eyebrow  = "WEEKLY RHYTHM",
             title    = "Which days cost the most?",
-            subtitle = if (peakDay != null) "Peaks on $peakDay" else "Spending pattern by day"
+            subtitle = if (peakDay != null) "Peaks on $peakDay · tap to explore" else "Spending pattern by day"
         )
 
         Row(
@@ -461,28 +470,28 @@ private fun WeeklyRhythmCard(weekdayPoints: List<WeekdayPoint>) {
             verticalAlignment = Alignment.Bottom
         ) {
             weekdayPoints.forEach { point ->
-                val frac     = (point.expenseMinor.toFloat() / maxVal).coerceIn(0f, 1f)
-                val isPeak   = point.label == peakDay && point.expenseMinor > 0
-                val barColor = if (isPeak) MaterialTheme.colorScheme.tertiary
-                               else MaterialTheme.colorScheme.tertiary.copy(alpha = 0.35f + 0.45f * frac)
+                val frac         = (point.expenseMinor.toFloat() / maxVal).coerceIn(0f, 1f)
+                val isSelected   = point.label == selectedLabel && point.expenseMinor > 0
+                val barColor     = if (isSelected) MaterialTheme.colorScheme.tertiary
+                                   else MaterialTheme.colorScheme.tertiary.copy(alpha = 0.35f + 0.45f * frac)
                 BarCol(
                     fraction    = frac,
                     color       = barColor,
                     chartHeight = chartH,
                     label       = point.label,
-                    modifier    = Modifier.weight(1f),
-                    labelColor  = if (isPeak) MaterialTheme.colorScheme.tertiary else Color.Unspecified
+                    modifier    = Modifier.weight(1f).clickable { selectedLabel = point.label },
+                    labelColor  = if (isSelected) MaterialTheme.colorScheme.tertiary else Color.Unspecified
                 )
             }
         }
 
-        // Show amounts for the peak day
-        val peak = weekdayPoints.maxByOrNull { it.expenseMinor }
-        if (peak != null && peak.expenseMinor > 0) {
+        val displayed = weekdayPoints.find { it.label == selectedLabel }
+            ?: weekdayPoints.maxByOrNull { it.expenseMinor }
+        if (displayed != null && displayed.expenseMinor > 0) {
             AccentDivider(accent = MaterialTheme.colorScheme.tertiary)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("${peak.label} total", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(formatAmount(peak.expenseMinor), style = MaterialTheme.typography.titleSmall.financialFigures(FontWeight.Bold), color = MaterialTheme.colorScheme.tertiary)
+                Text("${displayed.label} total", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(formatAmount(displayed.expenseMinor), style = MaterialTheme.typography.titleSmall.financialFigures(FontWeight.Bold), color = MaterialTheme.colorScheme.tertiary)
             }
         }
     }
