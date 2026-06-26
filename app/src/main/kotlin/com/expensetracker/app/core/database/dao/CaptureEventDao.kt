@@ -73,7 +73,7 @@ interface CaptureEventDao {
     @Query("UPDATE capture_events SET parseStatus = 'IGNORED' WHERE id = :eventId")
     suspend fun markIgnored(eventId: Long)
 
-    @Query("UPDATE capture_events SET parseStatus = 'IGNORED' WHERE parseStatus = 'SUGGESTED'")
+    @Query("UPDATE capture_events SET parseStatus = 'IGNORED' WHERE parseStatus IN ('PENDING', 'SUCCESS') AND linkedTransactionId IS NULL")
     suspend fun markAllIgnored()
 
     @Query("DELETE FROM capture_events WHERE linkedTransactionId IS NOT NULL AND parseStatus = 'SUCCESS'")

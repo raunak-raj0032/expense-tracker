@@ -22,15 +22,31 @@ class LocalModelDownloader @Inject constructor() {
             throw IOException("Model CDN URL is not configured.")
         }
 
-        val connection = (URL(AiModelSpec.DOWNLOAD_URL).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 15_000
-            readTimeout = 60_000
-            instanceFollowRedirects = true
-            if (hfToken.isNotBlank()) setRequestProperty("Authorization", "Bearer $hfToken")
+        val hfHost = URL(AiModelSpec.DOWNLOAD_URL).host
+        var connection = openConnection(AiModelSpec.DOWNLOAD_URL, hfToken)
+        // HuggingFace redirects to LFS CDN presigned URLs. HttpURLConnection with
+        // instanceFollowRedirects forwards the Authorization header to the CDN host, which
+        // rejects it. Follow redirects manually and only send auth to the HF host.
+        repeat(5) {
+            val code = connection.responseCode
+            if (code in 301..303 || code == 307 || code == 308) {
+                val location = connection.getHeaderField("Location")
+                    ?: throw IOException("Redirect with no Location header.")
+                connection.disconnect()
+                val sendAuth = URL(location).host == hfHost
+                connection = openConnection(location, if (sendAuth) hfToken else "")
+            } else {
+                return@repeat
+            }
         }
         try {
             val code = connection.responseCode
+            if (code == HttpURLConnection.HTTP_UNAUTHORIZED || code == HttpURLConnection.HTTP_FORBIDDEN) {
+                throw IOException(
+                    if (hfToken.isBlank()) "A HuggingFace token is required to download this model. Add one in Settings → AI."
+                    else "HuggingFace token rejected (HTTP $code). Check the token in Settings → AI and make sure it has read access."
+                )
+            }
             if (code !in 200..299) throw IOException("Model download failed with HTTP $code.")
 
             val total = connection.contentLengthLong.takeIf { it > 0L } ?: AiModelSpec.DISPLAY_SIZE_BYTES
@@ -52,6 +68,15 @@ class LocalModelDownloader @Inject constructor() {
             connection.disconnect()
         }
     }
+
+    private fun openConnection(url: String, token: String): HttpURLConnection =
+        (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 15_000
+            readTimeout = 60_000
+            instanceFollowRedirects = false
+            if (token.isNotBlank()) setRequestProperty("Authorization", "Bearer $token")
+        }
 
     private fun validate(file: File) {
         if (!file.exists() || file.length() == 0L) throw IOException("Downloaded model file is empty.")

@@ -4,6 +4,8 @@ package com.expensetracker.app.ui.screens.transaction
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -77,7 +79,7 @@ import com.expensetracker.app.ui.theme.appButtonSizing
 import com.expensetracker.app.ui.theme.financialFigures
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -346,6 +348,15 @@ fun TransactionDatePicker(
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     val formatter = remember { DateTimeFormatter.ofPattern("dd MMM yy") }
+    val dateFieldInteractionSource = remember { MutableInteractionSource() }
+
+    LaunchedEffect(dateFieldInteractionSource) {
+        dateFieldInteractionSource.interactions.collect { interaction ->
+            if (interaction is PressInteraction.Release) {
+                showDatePicker = true
+            }
+        }
+    }
 
     OutlinedTextField(
         value = selectedDate.format(formatter),
@@ -362,19 +373,20 @@ fun TransactionDatePicker(
             .clickable { showDatePicker = true }
             .testTag("transaction_date_input"),
         singleLine = true,
+        interactionSource = dateFieldInteractionSource,
         colors = fieldColors()
     )
 
     if (showDatePicker) {
         val pickerState = rememberDatePickerState(
-            initialSelectedDateMillis = selectedDate.toEpochMillisStart()
+            initialSelectedDateMillis = selectedDate.toDatePickerUtcMillis()
         )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        pickerState.selectedDateMillis?.toLocalDate()?.let(onDateChange)
+                        pickerState.selectedDateMillis?.toDatePickerLocalDate()?.let(onDateChange)
                         showDatePicker = false
                     }
                 ) { Text("Apply") }
@@ -604,8 +616,8 @@ private fun fieldColors() = OutlinedTextFieldDefaults.colors(
     focusedContainerColor = Color.Transparent
 )
 
-private fun LocalDate.toEpochMillisStart(): Long =
-    atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+internal fun LocalDate.toDatePickerUtcMillis(): Long =
+    atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 
-private fun Long.toLocalDate(): LocalDate =
-    Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDate()
+internal fun Long.toDatePickerLocalDate(): LocalDate =
+    Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
